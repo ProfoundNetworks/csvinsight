@@ -56,7 +56,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'csvinsight'
-copyright = u"2017, Michael Penkov"
+copyright = u"2017, Profound Networks"
 
 # The version info for the project you're documenting, acts as replacement
 # for |version| and |release|, also used in various other places throughout
