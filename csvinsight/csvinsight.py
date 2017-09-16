@@ -63,8 +63,7 @@ class Buffer(object):
             self._buf[col_name] = []
 
 
-def _map_worker(line_queue, counter_queue, header, list_fields, locks, output_dir):
-    open_file = functools.partial(_open_file, output_dir=output_dir, mode='ab')
+def _map_worker(line_queue, counter_queue, header, list_fields, locks, open_file):
     buf = Buffer(header, locks, open_file)
     counter = collections.Counter()
     list_fields = set(list_fields)
@@ -118,10 +117,11 @@ def map(fin, list_fields=[]):
     line_queue = multiprocessing.Queue(_NUM_WORKERS * 1000)
     counter_queue = multiprocessing.Queue()
 
+    open_file = functools.partial(_open_file, output_dir=output_dir, mode='ab')
     workers = [
         multiprocessing.Process(
             target=_map_worker,
-            args=(line_queue, counter_queue, header, list_fields, locks, output_dir)
+            args=(line_queue, counter_queue, header, list_fields, locks, open_file)
         ) for _ in range(_NUM_WORKERS)
     ]
 
