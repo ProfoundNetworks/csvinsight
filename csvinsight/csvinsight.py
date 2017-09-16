@@ -63,33 +63,42 @@ class Buffer(object):
             self._buf[col_name] = []
 
 
-def _map_worker(line_queue, counter_queue, header, list_fields, locks, open_file):
-    buf = Buffer(header, locks, open_file)
-    counter = collections.Counter()
-    list_fields = set(list_fields)
+class Parser(object):
+    """Parses lines into CSV rows/cells."""
+    def __init__(self, header, list_fields=[],
+                 delimiter=_DELIMITER, list_separator=_LIST_SEPARATOR):
+        self._header = header
+        self._list_fields = set(list_fields)
+        self._counter = collections.Counter()
+        self._delimiter = delimiter
+        self._list_separator = list_separator
 
-    while True:
-        line = line_queue.get()
-        if line is None:
-            break
-        row = line.rstrip(b'\n').split(_DELIMITER)
-        counter[len(row)] += 1
-        if len(row) != len(header):
+    def parse_line(self, line, buf):
+        row = line.rstrip(b'\n').split(self._delimiter)
+        self._counter[len(row)] += 1
+        if len(row) != len(self._header):
             _LOGGER.error('row length (%d) does not match header length (%d), skipping line %r',
-                          len(row), len(header), line)
-            continue
+                          len(row), len(self._header), line)
+            return
 
-        for col_number, (col_name, cell_value) in enumerate(zip(header, row)):
-            if col_name in list_fields:
-                values = cell_value.split(_LIST_SEPARATOR)
+        for col_number, (col_name, cell_value) in enumerate(zip(self._header, row)):
+            if col_name in self._list_fields:
+                values = cell_value.split(self._list_separator)
             else:
                 values = [cell_value]
             for value in values:
                 buf.add(col_name, value)
         buf.increment()
 
-    buf.flush()
-    counter_queue.put(counter)
+
+def _map_worker(line_queue, counter_queue, parser, buffer_):
+    while True:
+        line = line_queue.get()
+        if line is None:
+            break
+        parser.parse_line(line, buffer_)
+    buffer_.flush()
+    counter_queue.put(parser._counter)
 
 
 def _create_output_dir():
@@ -121,7 +130,10 @@ def map(fin, list_fields=[]):
     workers = [
         multiprocessing.Process(
             target=_map_worker,
-            args=(line_queue, counter_queue, header, list_fields, locks, open_file)
+            args=(
+                line_queue, counter_queue, Parser(header, list_fields),
+                Buffer(header, locks, open_file)
+            )
         ) for _ in range(_NUM_WORKERS)
     ]
 
