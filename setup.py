@@ -37,7 +37,9 @@ setup(
     packages=find_packages(include=['csvinsight']),
     entry_points={
         'console_scripts': [
-            'csvinsight=csvinsight.cli:main'
+            'csvi=csvinsight.cli:main',
+            'csvi_map=csvinsight.cli:main_map',
+            'csvi_reduce=csvinsight.cli:main_reduce',
         ]
     },
     include_package_data=True,
