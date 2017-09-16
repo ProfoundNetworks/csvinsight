@@ -28,39 +28,21 @@ _MOST_COMMON = 20
 _LOGGER = logging.getLogger(__name__)
 
 
-class Buffer(object):
-    """Keeps a limited number of rows in memory.
-
-    When the limit is reached, writes each column to a separate file.
-    Expects other Buffer instances to be doing the same thing in other
-    subprocesses."""
-    def __init__(self, header, locks, open_file, limit=100000):
-        self._buf = {col_name: list() for col_name in header}
-        self._count = 0
-        self._limit = limit
-        self._locks = locks
+class Writer(object):
+    def __init__(self, header, open_file):
         self._open_file = open_file
+        self._fout = {}
 
-    def add(self, column_name, value):
-        self._buf[column_name].append(value)
+    def write(self, column_name, value):
+        try:
+            fout = self._fout[column_name]
+        except KeyError:
+            fout = self._fout[column_name] = self._open_file(column_name)
+        fout.write(value + b'\n')
 
-    def increment(self):
-        self._count += 1
-        if self._count > self._limit:
-            self.flush()
-
-    def flush(self):
-        for column_name in self._buf:
-            self._flush_column(column_name)
-        self._count = 0
-
-    def _flush_column(self, col_name):
-        with self._locks[col_name], self._open_file(col_name) as fout:
-            _LOGGER.debug('flushing %r', col_name)
-            for value in self._buf[col_name]:
-                fout.write(value + b'\n')
-            fout.flush()
-            self._buf[col_name] = []
+    def close(self):
+        for fout in six.itervalues(self._fout):
+            fout.close()
 
 
 class Parser(object):
@@ -73,7 +55,7 @@ class Parser(object):
         self._delimiter = delimiter
         self._list_separator = list_separator
 
-    def parse_line(self, line, buf):
+    def parse_line(self, line, writer):
         row = line.rstrip(b'\n').split(self._delimiter)
         self._counter[len(row)] += 1
         if len(row) != len(self._header):
@@ -87,17 +69,16 @@ class Parser(object):
             else:
                 values = [cell_value]
             for value in values:
-                buf.add(col_name, value)
-        buf.increment()
+                writer.write(col_name, value)
 
 
-def _map_worker(line_queue, counter_queue, parser, buffer_):
+def _map_worker(line_queue, counter_queue, parser, writer):
     while True:
         line = line_queue.get()
         if line is None:
             break
-        parser.parse_line(line, buffer_)
-    buffer_.flush()
+        parser.parse_line(line, writer)
+    writer.close()
     counter_queue.put(parser._counter)
 
 
@@ -109,9 +90,9 @@ def _create_output_dir():
     return dir_path
 
 
-def _open_file(column_name=None, mode='wb', output_dir=None):
+def _open_file(column_name=None, mode='wb', output_dir=None, suffix=None):
     assert column_name, 'column_name cannot be empty or None'
-    return gzip.open(P.join(output_dir, column_name), mode)
+    return gzip.open(P.join(output_dir, column_name + '.' + suffix), mode)
 
 
 def map(fin, list_fields=[]):
@@ -119,22 +100,22 @@ def map(fin, list_fields=[]):
     header = fin.readline().rstrip().split(_DELIMITER)
     _LOGGER.info('header: %r', header)
 
-    for col_name in header:
-        _open_file(col_name, output_dir=output_dir)
-
-    locks = {column_name: multiprocessing.Lock() for column_name in header}
     line_queue = multiprocessing.Queue(_NUM_WORKERS * 1000)
     counter_queue = multiprocessing.Queue()
 
-    open_file = functools.partial(_open_file, output_dir=output_dir, mode='ab')
     workers = [
         multiprocessing.Process(
             target=_map_worker,
             args=(
                 line_queue, counter_queue, Parser(header, list_fields),
-                Buffer(header, locks, open_file)
+                Writer(
+                    header,
+                    functools.partial(
+                        _open_file, output_dir=output_dir, mode='wb', suffix=str(i)
+                    )
+                )
             )
-        ) for _ in range(_NUM_WORKERS)
+        ) for i in range(_NUM_WORKERS)
     ]
 
     for w in workers:
@@ -217,7 +198,7 @@ def reduce_wrapper(tupl):
     #
     # TODO: use pigz and gsort where possible?
     #
-    command = 'gunzip -c %s | sort | csvi_reduce' % P.join(output_dir, column_name)
+    command = 'cat %s.* | gunzip -c | sort | csvi_reduce' % P.join(output_dir, column_name)
     _LOGGER.info('command: %r', command)
     env = dict(os.environ, LC_ALL='C')
     summary = json.loads(subprocess.check_output(command, shell=True, env=env))
