@@ -6,10 +6,10 @@
 """Console script for csvinsight."""
 from __future__ import print_function
 
+import argparse
 import logging
 import sys
 
-import click
 import json
 
 from . import csvinsight
@@ -17,16 +17,31 @@ from . import csvinsight
 _LOGGER = logging.getLogger(__name__)
 
 
-@click.command()
-def main_map(args=None):
-    logging.basicConfig(level=logging.INFO)
-    header, counter, output_dir = csvinsight.map(sys.stdin)
+def _add_default_args(parser):
+    parser.add_argument('--loglevel', default=logging.INFO)
+
+
+def _add_map_args(parser):
+    parser.add_argument('--list-fields', nargs='*', default=[])
+
+
+def main_map():
+    parser = argparse.ArgumentParser()
+    _add_default_args(parser)
+    _add_map_args(parser)
+    args = parser.parse_args()
+
+    logging.basicConfig(level=args.loglevel)
+    header, counter, output_dir = csvinsight.map(sys.stdin, list_fields=args.list_fields)
     print(output_dir)
 
 
-@click.command()
-def main_reduce(args=None):
-    logging.basicConfig(level=logging.INFO)
+def main_reduce():
+    parser = argparse.ArgumentParser()
+    _add_default_args(parser)
+    args = parser.parse_args()
+
+    logging.basicConfig(level=args.loglevel)
     summary = csvinsight.reduce(sys.stdin)
     #
     # This can convert UTF-8 to Unicode, e.g.
@@ -35,11 +50,16 @@ def main_reduce(args=None):
     json.dump(summary, sys.stdout)
 
 
-@click.command()
-def main(args=None):
+def main():
     """Main console script for csvinsight."""
-    logging.basicConfig(level=logging.INFO)
-    report = csvinsight.generate_report(sys.stdin)
+    parser = argparse.ArgumentParser()
+    _add_default_args(parser)
+    _add_map_args(parser)
+    args = parser.parse_args()
+
+    logging.basicConfig(level=args.loglevel)
+    map_kwargs = {'list_fields': args.list_fields}
+    report = csvinsight.generate_report(sys.stdin, map_kwargs=map_kwargs)
     _LOGGER.info('finished reduce, formatting report')
     csvinsight.print_report(report, sys.stdout)
 

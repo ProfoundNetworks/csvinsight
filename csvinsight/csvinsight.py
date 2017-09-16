@@ -67,6 +67,8 @@ def _map_worker(line_queue, counter_queue, header, list_fields, locks, output_di
     open_file = functools.partial(_open_file, output_dir=output_dir, mode='ab')
     buf = Buffer(header, locks, open_file)
     counter = collections.Counter()
+    list_fields = set(list_fields)
+
     while True:
         line = line_queue.get()
         if line is None:
@@ -104,7 +106,7 @@ def _open_file(column_name=None, mode='wb', output_dir=None):
     return gzip.open(P.join(output_dir, column_name), mode)
 
 
-def map(fin):
+def map(fin, list_fields=[]):
     output_dir = _create_output_dir()
     header = fin.readline().rstrip().split(_DELIMITER)
     _LOGGER.info('header: %r', header)
@@ -116,7 +118,6 @@ def map(fin):
     line_queue = multiprocessing.Queue(_NUM_WORKERS * 1000)
     counter_queue = multiprocessing.Queue()
 
-    list_fields = set()
     workers = [
         multiprocessing.Process(
             target=_map_worker,
@@ -248,9 +249,9 @@ def _print_summary(summary, fout):
     print('', file=fout)
 
 
-def generate_report(fin):
+def generate_report(fin, map_kwargs={}):
     _LOGGER.info('starting map')
-    header, counter, output_dir = map(fin)
+    header, counter, output_dir = map(fin, **map_kwargs)
     _LOGGER.info('finished map, starting reduce')
     pool = multiprocessing.Pool(processes=_NUM_WORKERS)
     columns = [(output_dir, num, name) for (num, name) in enumerate(header, 1)]
