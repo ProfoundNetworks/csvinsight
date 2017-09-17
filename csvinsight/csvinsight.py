@@ -28,12 +28,20 @@ _MOST_COMMON = 20
 _LOGGER = logging.getLogger(__name__)
 
 
-class Writer(object):
-    def __init__(self, header, open_file):
+class ColumnSplitter(object):
+    """Splits CSV lines into columns, where each column goes to an individual file."""
+    def __init__(self, header, open_file, list_fields=[],
+                 delimiter=_DELIMITER, list_separator=_LIST_SEPARATOR):
+        self._header = header
         self._open_file = open_file
+        self._list_fields = set(list_fields)
+        self._counter = collections.Counter()
+        self._delimiter = delimiter
+        self._list_separator = list_separator
+
         self._fout = {}
 
-    def write(self, column_name, value):
+    def _write(self, column_name, value):
         try:
             fout = self._fout[column_name]
         except KeyError:
@@ -44,18 +52,7 @@ class Writer(object):
         for fout in six.itervalues(self._fout):
             fout.close()
 
-
-class Parser(object):
-    """Parses lines into CSV rows/cells."""
-    def __init__(self, header, list_fields=[],
-                 delimiter=_DELIMITER, list_separator=_LIST_SEPARATOR):
-        self._header = header
-        self._list_fields = set(list_fields)
-        self._counter = collections.Counter()
-        self._delimiter = delimiter
-        self._list_separator = list_separator
-
-    def parse_line(self, line, writer):
+    def split_line(self, line):
         row = line.rstrip(b'\n').split(self._delimiter)
         self._counter[len(row)] += 1
         if len(row) != len(self._header):
@@ -69,17 +66,17 @@ class Parser(object):
             else:
                 values = [cell_value]
             for value in values:
-                writer.write(col_name, value)
+                self._write(col_name, value)
 
 
-def _map_worker(line_queue, counter_queue, parser, writer):
+def _map_worker(line_queue, counter_queue, splitter):
     while True:
         line = line_queue.get()
         if line is None:
             break
-        parser.parse_line(line, writer)
-    writer.close()
-    counter_queue.put(parser._counter)
+        splitter.split_line(line)
+    splitter.close()
+    counter_queue.put(splitter._counter)
 
 
 def _create_output_dir():
@@ -107,12 +104,10 @@ def map(fin, list_fields=[]):
         multiprocessing.Process(
             target=_map_worker,
             args=(
-                line_queue, counter_queue, Parser(header, list_fields),
-                Writer(
+                line_queue, counter_queue, ColumnSplitter(
                     header,
-                    functools.partial(
-                        _open_file, output_dir=output_dir, mode='wb', suffix=str(i)
-                    )
+                    functools.partial(_open_file, output_dir=output_dir, mode='wb', suffix=str(i)),
+                    list_fields=list_fields
                 )
             )
         ) for i in range(_NUM_WORKERS)
