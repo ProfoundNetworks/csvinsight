@@ -85,3 +85,54 @@ def test_column_splitter():
 
     assert splitter._fout['foo'].getvalue() == b'1\n4\n'
     assert splitter._fout['bar'].getvalue() == b'2\n3\n5\n6\n'
+
+
+def test_column():
+    column = csvinsight.Column('foo')
+    column.add('bar')
+    column.add('foo')
+    column.add('1')
+    column.add('')
+    column.finalize()
+    actual = column.get_summary()
+    expected = {
+        'num_values': 5,
+        'num_fills': 4,
+        'fill_rate': 80,
+        'max_len': 3,
+        'min_len': 0,
+        'avg_len': 2
+    }
+    assert expected == actual
+
+
+def test_sorted_column():
+    column = csvinsight.SortedColumn('')
+    column.add('a')
+    column.add('a')
+    column.add('b')
+    column.add('c')
+    column.add('c')
+    column.add('c')
+    column.add('d')
+    column.finalize()
+    actual = column.get_summary()
+    expected = {
+        'num_values': 8,
+        'num_fills': 7,
+        'fill_rate': 87.5,
+        'max_len': 1,
+        'min_len': 0,
+        'avg_len': 0.875,
+        #
+        # TODO: need to do something about the sort order here
+        #
+        'most_common': [(3, 'c'), (2, 'a'), (1, 'd'), (1, 'b'), (1, '')]
+    }
+    assert expected == actual
+
+
+def test_sorted_column_unsorted_input():
+    column = csvinsight.SortedColumn('b')
+    with pytest.raises(ValueError):
+        column.add('a')

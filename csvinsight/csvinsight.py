@@ -150,42 +150,77 @@ class TopN(object):
         return [heapq.heappop(heapcopy) for _ in range(heapsize)]
 
 
-def reduce(fin):
-    prev_val = fin.readline().rstrip(b'\n')
-    num_unique = num_values = run_length = 1
-    num_fills = 0 if prev_val == _BLANK else 1
-    max_len = min_len = sum_len = len(prev_val)
-    topn = TopN(limit=_MOST_COMMON)
+class Column(object):
+    """Summarizes a single column of a table, without assumptions about sortedness."""
+    def __init__(self, first_val=_BLANK):
+        self._prev_val = first_val
+        self._num_values = 1
+        self._num_fills = 0 if first_val == _BLANK else 1
+        self._max_len = self._min_len = self._sum_len = len(first_val)
 
-    for line in fin:
-        line = line.rstrip(b'\n')
-        assert line >= prev_val, 'input not sorted (%r < %r), make sure LC_ALL=C' % (line, prev_val)
-        if line != prev_val:
-            topn.push(run_length, prev_val)
-            num_unique += 1
-            run_length = 1
-        else:
-            run_length += 1
-        num_values += 1
+    def add(self, line):
+        self._num_values += 1
         if line != _BLANK:
-            num_fills += 1
+            self._num_fills += 1
         line_len = len(line)
-        max_len = max(line_len, max_len)
-        min_len = min(line_len, min_len)
-        sum_len += line_len
-        prev_val = line
-    topn.push(run_length, prev_val)
+        self._max_len = max(line_len, self._max_len)
+        self._min_len = min(line_len, self._min_len)
+        self._sum_len += line_len
+        self._prev_val = line
 
-    return {
-        'num_uniques': num_unique,
-        'num_values': num_values,
-        'num_fills': num_fills,
-        'fill_rate': 100 * num_fills / num_values,
-        'max_len': max_len,
-        'min_len': min_len,
-        'avg_len': sum_len / num_values,
-        'most_common': list(reversed(topn.to_list()))
-    }
+    def finalize(self):
+        pass
+
+    def get_summary(self):
+        return {
+            'num_values': self._num_values,
+            'num_fills': self._num_fills,
+            'fill_rate': 100 * self._num_fills / self._num_values,
+            'max_len': self._max_len,
+            'min_len': self._min_len,
+            'avg_len': self._sum_len / self._num_values,
+        }
+
+
+class SortedColumn(Column):
+    """Summarizes a single column of a table, assuming that it is sorted.
+
+    Sorted columns allow the number of unique values to be calculated easily."""
+    def __init__(self, first_val=_BLANK):
+        super(SortedColumn, self).__init__(first_val=first_val)
+        self._num_unique = self._run_length = 1
+        self._topn = TopN(limit=_MOST_COMMON)
+
+    def add(self, line):
+        if line < self._prev_val:
+            raise ValueError(
+                'input not sorted (%r < %r), make sure LC_ALL=C' % (line, self._prev_val)
+            )
+
+        if line != self._prev_val:
+            self._topn.push(self._run_length, self._prev_val)
+            self._num_unique += 1
+            self._run_length = 1
+        else:
+            self._run_length += 1
+        super(SortedColumn, self).add(line)
+
+    def finalize(self):
+        self._topn.push(self._run_length, self._prev_val)
+
+    def get_summary(self):
+        dict_ = super(SortedColumn, self).get_summary()
+        dict_['most_common'] = list(reversed(self._topn.to_list()))
+        return dict_
+
+
+def reduce(fin, column_class=SortedColumn):
+    prev_val = fin.readline().rstrip(b'\n')
+    column = column_class(prev_val)
+    for line in fin:
+        column.add(line.rstrip(b'\n'))
+    column.finalize()
+    return column.get_summary()
 
 
 def reduce_wrapper(tupl):
