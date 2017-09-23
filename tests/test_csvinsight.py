@@ -88,7 +88,8 @@ def test_column_splitter():
 
 
 def test_column():
-    column = csvinsight.Column('foo')
+    column = csvinsight.Column()
+    column.add('foo')
     column.add('bar')
     column.add('foo')
     column.add('1')
@@ -107,7 +108,8 @@ def test_column():
 
 
 def test_sorted_column():
-    column = csvinsight.SortedColumn('')
+    column = csvinsight.SortedColumn()
+    column.add('')
     column.add('a')
     column.add('a')
     column.add('b')
@@ -133,6 +135,7 @@ def test_sorted_column():
 
 
 def test_sorted_column_unsorted_input():
-    column = csvinsight.SortedColumn('b')
+    column = csvinsight.SortedColumn()
+    column.add('b')
     with pytest.raises(ValueError):
         column.add('a')

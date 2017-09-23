@@ -17,6 +17,7 @@ import os
 import os.path as P
 import shutil
 import subprocess
+import sys
 
 import six
 
@@ -152,11 +153,13 @@ class TopN(object):
 
 class Column(object):
     """Summarizes a single column of a table, without assumptions about sortedness."""
-    def __init__(self, first_val=_BLANK):
-        self._prev_val = first_val
-        self._num_values = 1
-        self._num_fills = 0 if first_val == _BLANK else 1
-        self._max_len = self._min_len = self._sum_len = len(first_val)
+    def __init__(self):
+        self._prev_val = None
+        self._num_values = 0
+        self._num_fills = 0
+        self._max_len = 0
+        self._min_len = sys.maxint
+        self._sum_len = 0
 
     def add(self, line):
         self._num_values += 1
@@ -186,9 +189,9 @@ class SortedColumn(Column):
     """Summarizes a single column of a table, assuming that it is sorted.
 
     Sorted columns allow the number of unique values to be calculated easily."""
-    def __init__(self, first_val=_BLANK):
-        super(SortedColumn, self).__init__(first_val=first_val)
-        self._num_unique = self._run_length = 1
+    def __init__(self):
+        super(SortedColumn, self).__init__()
+        self._num_unique = self._run_length = 0
         self._topn = TopN(limit=_MOST_COMMON)
 
     def add(self, line):
@@ -197,7 +200,10 @@ class SortedColumn(Column):
                 'input not sorted (%r < %r), make sure LC_ALL=C' % (line, self._prev_val)
             )
 
-        if line != self._prev_val:
+        if self._prev_val is None:
+            self._num_unique = 1
+            self._run_length = 1
+        elif line != self._prev_val:
             self._topn.push(self._run_length, self._prev_val)
             self._num_unique += 1
             self._run_length = 1
@@ -215,8 +221,7 @@ class SortedColumn(Column):
 
 
 def reduce(fin, column_class=SortedColumn):
-    prev_val = fin.readline().rstrip(b'\n')
-    column = column_class(prev_val)
+    column = column_class()
     for line in fin:
         column.add(line.rstrip(b'\n'))
     column.finalize()
