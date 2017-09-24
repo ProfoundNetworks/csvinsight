@@ -54,13 +54,17 @@ def main():
     """Main console script for csvinsight."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--simple', action='store_true')
+    parser.add_argument('--delimiter', default='|')
+    parser.add_argument('--list-separator', default=';')
     _add_default_args(parser)
     _add_map_args(parser)
     args = parser.parse_args()
 
     logging.basicConfig(level=args.loglevel)
 
-    map_kwargs = {'list_fields': args.list_fields}
+    map_kwargs = {'list_fields': args.list_fields, 'delimiter': args.delimiter,
+                  'list_separator': args.list_separator}
+    _LOGGER.info('map_kwargs: %r', map_kwargs)
     if args.simple:
         report = csvinsight.simple_report(sys.stdin, **map_kwargs)
     else:

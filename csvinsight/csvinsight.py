@@ -92,9 +92,9 @@ def _open_file(column_name=None, mode='wb', output_dir=None, suffix=None):
     return gzip.open(P.join(output_dir, column_name + '.' + suffix), mode)
 
 
-def map(fin, list_fields=[]):
+def map(fin, list_fields=[], delimiter=_DELIMITER, list_separator=_LIST_SEPARATOR):
     output_dir = _create_output_dir()
-    header = fin.readline().rstrip().split(_DELIMITER)
+    header = fin.readline().rstrip().split(delimiter)
     _LOGGER.info('header: %r', header)
 
     line_queue = multiprocessing.Queue(_NUM_WORKERS * 1000)
@@ -107,7 +107,9 @@ def map(fin, list_fields=[]):
                 line_queue, counter_queue, ColumnSplitter(
                     header,
                     functools.partial(_open_file, output_dir=output_dir, mode='wb', suffix=str(i)),
-                    list_fields=list_fields
+                    list_fields=list_fields,
+                    delimiter=delimiter,
+                    list_separator=list_separator
                 )
             )
         ) for i in range(_NUM_WORKERS)
@@ -298,13 +300,13 @@ def _print_summary(summary, fout):
     print('', file=fout)
 
 
-def simple_report(fin, list_fields=[]):
+def simple_report(fin, list_fields=[], delimiter=_DELIMITER, list_separator=_LIST_SEPARATOR):
     counter = collections.Counter()
-    header = fin.readline().rstrip().split(_DELIMITER)
+    header = fin.readline().rstrip().split(delimiter)
     columns = tuple(Column(number, name, name in list_fields)
                     for (number, name) in enumerate(header, 1))
     for line in fin:
-        row = line.rstrip().split(_DELIMITER)
+        row = line.rstrip().split(delimiter)
         if len(row) != len(header):
             _LOGGER.error('row length (%d) does not match header length (%d), skipping line %r',
                           len(row), len(header), line)
