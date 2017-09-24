@@ -39,7 +39,6 @@ class ColumnSplitter(object):
         self._counter = collections.Counter()
         self._delimiter = delimiter
         self._list_separator = list_separator
-
         self._fout = {}
 
     def _write(self, column_name, value):
@@ -153,15 +152,24 @@ class TopN(object):
 
 class Column(object):
     """Summarizes a single column of a table, without assumptions about sortedness."""
-    def __init__(self):
-        self._prev_val = None
+    def __init__(self, number=1, name='column_name', values_are_lists=False):
+        self._number = number
+        self._name = name
         self._num_values = 0
         self._num_fills = 0
         self._max_len = 0
         self._min_len = sys.maxint
         self._sum_len = 0
+        if values_are_lists:
+            self.add = self._add_list
+        else:
+            self.add = self._add_value
 
-    def add(self, line):
+    def _add_list(self, line):
+        for value in line.split(_LIST_SEPARATOR):
+            self._add_value(value)
+
+    def _add_value(self, line):
         self._num_values += 1
         if line != _BLANK:
             self._num_fills += 1
@@ -169,14 +177,16 @@ class Column(object):
         self._max_len = max(line_len, self._max_len)
         self._min_len = min(line_len, self._min_len)
         self._sum_len += line_len
-        self._prev_val = line
 
     def finalize(self):
         pass
 
     def get_summary(self):
         return {
+            'number': self._number,
+            'name': self._name,
             'num_values': self._num_values,
+            'num_uniques': -1,
             'num_fills': self._num_fills,
             'fill_rate': 100 * self._num_fills / self._num_values,
             'max_len': self._max_len,
@@ -189,39 +199,46 @@ class SortedColumn(Column):
     """Summarizes a single column of a table, assuming that it is sorted.
 
     Sorted columns allow the number of unique values to be calculated easily."""
-    def __init__(self):
-        super(SortedColumn, self).__init__()
-        self._num_unique = self._run_length = 0
+    def __init__(self, number=1, name='column_name'):
+        super(SortedColumn, self).__init__(number=number, name=name, values_are_lists=False)
+        self._num_uniques = self._run_length = 0
         self._topn = TopN(limit=_MOST_COMMON)
+        self._prev_val = None
+        self.add = self._add_value
 
-    def add(self, line):
+    def _add_value(self, line):
         if line < self._prev_val:
             raise ValueError(
                 'input not sorted (%r < %r), make sure LC_ALL=C' % (line, self._prev_val)
             )
 
         if self._prev_val is None:
-            self._num_unique = 1
+            self._num_uniques = 1
             self._run_length = 1
         elif line != self._prev_val:
             self._topn.push(self._run_length, self._prev_val)
-            self._num_unique += 1
+            self._num_uniques += 1
             self._run_length = 1
         else:
             self._run_length += 1
-        super(SortedColumn, self).add(line)
+        self._prev_val = line
+        super(SortedColumn, self)._add_value(line)
+        _LOGGER.debug('self._topn: %r', self._topn)
 
     def finalize(self):
         self._topn.push(self._run_length, self._prev_val)
+        self._prev_val = None
+        self._run_length = 0
 
     def get_summary(self):
         dict_ = super(SortedColumn, self).get_summary()
-        dict_['most_common'] = list(reversed(self._topn.to_list()))
+        dict_.update(most_common=list(reversed(self._topn.to_list())),
+                     num_uniques=self._num_uniques)
         return dict_
 
 
 def reduce(fin, column_class=SortedColumn):
-    column = column_class()
+    column = column_class(1, 'column_name')
     for line in fin:
         column.add(line.rstrip(b'\n'))
     column.finalize()
@@ -248,6 +265,10 @@ def _print_summary(summary, fout):
     fmt_str3 = "        {}  {:5.2f} %  {}"
     print(fmt_str1 % summary, file=fout)
     print(fmt_str2 % summary, file=fout)
+
+    if summary['num_uniques'] == -1:
+        print('', file=fout)
+        return
 
     num_samples = remainder = summary['num_values']
     print("        Counts      Percent  Field Value", file=fout)
@@ -277,7 +298,28 @@ def _print_summary(summary, fout):
     print('', file=fout)
 
 
-def generate_report(fin, map_kwargs={}):
+def simple_report(fin, list_fields=[]):
+    counter = collections.Counter()
+    header = fin.readline().rstrip().split(_DELIMITER)
+    columns = tuple(Column(number, name, name in list_fields)
+                    for (number, name) in enumerate(header, 1))
+    for line in fin:
+        row = line.rstrip().split(_DELIMITER)
+        if len(row) != len(header):
+            _LOGGER.error('row length (%d) does not match header length (%d), skipping line %r',
+                          len(row), len(header), line)
+        counter[len(row)] += 1
+        for col, val in zip(columns, row):
+            col.add(val)
+
+    for col in columns:
+        col.finalize()
+
+    summaries = tuple(col.get_summary() for col in columns)
+    return {'header': header, 'counter': counter, 'summaries': summaries}
+
+
+def full_report(fin, map_kwargs={}):
     _LOGGER.info('starting map')
     header, counter, output_dir = map(fin, **map_kwargs)
     _LOGGER.info('finished map, starting reduce')

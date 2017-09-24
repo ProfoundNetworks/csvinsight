@@ -53,13 +53,18 @@ def main_reduce():
 def main():
     """Main console script for csvinsight."""
     parser = argparse.ArgumentParser()
+    parser.add_argument('--simple', action='store_true')
     _add_default_args(parser)
     _add_map_args(parser)
     args = parser.parse_args()
 
     logging.basicConfig(level=args.loglevel)
+
     map_kwargs = {'list_fields': args.list_fields}
-    report = csvinsight.generate_report(sys.stdin, map_kwargs=map_kwargs)
+    if args.simple:
+        report = csvinsight.simple_report(sys.stdin, **map_kwargs)
+    else:
+        report = csvinsight.full_report(sys.stdin, map_kwargs=map_kwargs)
     _LOGGER.info('finished reduce, formatting report')
     csvinsight.print_report(report, sys.stdout)
 

@@ -4,6 +4,7 @@
 """Tests for `csvinsight` package."""
 
 import io
+import logging
 
 import pytest
 
@@ -11,6 +12,8 @@ from click.testing import CliRunner
 
 from csvinsight import csvinsight
 from csvinsight import cli
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 @pytest.fixture
@@ -97,8 +100,11 @@ def test_column():
     column.finalize()
     actual = column.get_summary()
     expected = {
+        'number': 1,
+        'name': 'column_name',
         'num_values': 5,
         'num_fills': 4,
+        'num_uniques': -1,
         'fill_rate': 80,
         'max_len': 3,
         'min_len': 0,
@@ -120,8 +126,11 @@ def test_sorted_column():
     column.finalize()
     actual = column.get_summary()
     expected = {
+        'number': 1,
+        'name': 'column_name',
         'num_values': 8,
         'num_fills': 7,
+        'num_uniques': 5,
         'fill_rate': 87.5,
         'max_len': 1,
         'min_len': 0,
