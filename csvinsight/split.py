@@ -89,7 +89,8 @@ def split(reader, open_file=open_temporary_file, list_columns=[],
     for thread in threads:
         thread.start()
 
-    histogram = populate_queues(header, reader, queues)
+    histogram = populate_queues(header, reader, queues,
+                                list_columns=list_columns, list_separator=list_separator)
 
     for queue in queues:
         queue.join()

@@ -58,20 +58,6 @@ def test_reduce():
     assert summary['most_common'] == [(1, b'foo')]
 
 
-def test_top_n():
-    topn = csvinsight.TopN(limit=3)
-    topn.push(1, 'foo')
-    topn.push(2, 'bar')
-    topn.push(3, 'baz')
-    assert topn.to_list() == [(1, 'foo'), (2, 'bar'), (3, 'baz')]
-
-    topn.push(4, 'boz')
-    assert topn.to_list() == [(2, 'bar'), (3, 'baz'), (4, 'boz')]
-
-    topn.push(1, 'oops')
-    assert topn.to_list() == [(2, 'bar'), (3, 'baz'), (4, 'boz')]
-
-
 def never_close(stream):
     stream.close = lambda: None
     return stream

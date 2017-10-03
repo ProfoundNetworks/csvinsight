@@ -1,9 +1,11 @@
 """Summarize a single column of values."""
 from __future__ import division
+import copy
+import heapq
 import pipes
 import sys
 
-
+MOST_COMMON = 20
 BLANK = b''
 
 
@@ -20,6 +22,25 @@ def run_length_encode(iterator):
     yield run_value, run_length
 
 
+class TopN(object):
+    def __init__(self, limit=MOST_COMMON):
+        self._heap = []
+        self._limit = limit
+
+    def push(self, frequency, value):
+        if len(self._heap) < self._limit:
+            heapq.heappush(self._heap, (frequency, value))
+        else:
+            lowest_frequency, _ = self._heap[0]
+            if frequency > lowest_frequency:
+                heapq.heapreplace(self._heap, (frequency, value))
+
+    def to_list(self):
+        heapsize = len(self._heap)
+        heapcopy = copy.deepcopy(self._heap)
+        return [heapq.heappop(heapcopy) for _ in range(heapsize)]
+
+
 def summarize_sorted(iterator):
     num_values = 0
     num_uniques = 0
@@ -27,6 +48,7 @@ def summarize_sorted(iterator):
     max_len = 0
     min_len = sys.maxint
     sum_len = 0
+    topn = TopN()
 
     for run_value, run_length in run_length_encode(iterator):
         if run_value == BLANK:
@@ -37,46 +59,24 @@ def summarize_sorted(iterator):
         max_len = max(max_len, val_len)
         min_len = min(min_len, val_len)
         sum_len += val_len * run_length
+        topn.push(run_length, run_value)
 
     return {
         'num_values': num_values,
         'num_fills': num_values - num_empty,
-        'fill_ratio': (num_values - num_empty) / num_values,
+        'fill_rate': 100. * (num_values - num_empty) / num_values,
         'max_len': max_len,
         'min_len': min_len,
         'avg_len': sum_len / num_values,
         'num_uniques': num_uniques,
+        'most_common': list(reversed(topn.to_list())),
     }
 
 
-def summarize_unsorted(iterator):
-    num_values = 0
-    num_empty = 0
-    max_len = 0
-    min_len = sys.maxint
-    sum_len = 0
-
-    for value in iterator:
-        if value == BLANK:
-            num_empty += 1
-        num_values += 1
-        val_len = len(value)
-        max_len = max(max_len, val_len)
-        min_len = min(min_len, val_len)
-        sum_len += val_len
-
-    return {
-        'num_values': num_values,
-        'num_fills': num_values - num_empty,
-        'fill_ratio': (num_values - num_empty) / num_values,
-        'max_len': max_len,
-        'min_len': min_len,
-        'avg_len': sum_len / num_values,
-    }
-
-
-def sort_and_summarize(path):
+def sort_and_summarize(path, gunzip=True):
     template = pipes.Template()
+    if gunzip:
+        template.append('gunzip -c', '--')
     template.append('LC_ALL=C sort', '--')
     with template.open(path, 'r') as fin:
         result = summarize_sorted(line.rstrip(b'\n') for line in fin)

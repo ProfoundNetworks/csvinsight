@@ -12,8 +12,8 @@ with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
 requirements = [
-    'Click>=6.0',
-    # TODO: put package requirements here
+    'pyyaml',
+    'six',
 ]
 
 setup_requirements = [
@@ -41,6 +41,7 @@ setup(
             'csvi_map=csvinsight.cli:main_map',
             'csvi_reduce=csvinsight.cli:main_reduce',
             'csvi_split=csvinsight.cli:main_split',
+            'csvi_summarize=csvinsight.cli:main_summarize',
         ]
     },
     include_package_data=True,

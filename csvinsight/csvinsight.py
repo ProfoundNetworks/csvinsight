@@ -142,25 +142,6 @@ def map(fin, reader_function=csv_reader, list_fields=[], delimiter=_DELIMITER,
     return header, counter, output_dir
 
 
-class TopN(object):
-    def __init__(self, limit=_MOST_COMMON):
-        self._heap = []
-        self._limit = limit
-
-    def push(self, frequency, value):
-        if len(self._heap) < self._limit:
-            heapq.heappush(self._heap, (frequency, value))
-        else:
-            lowest_frequency, _ = self._heap[0]
-            if frequency > lowest_frequency:
-                heapq.heapreplace(self._heap, (frequency, value))
-
-    def to_list(self):
-        heapsize = len(self._heap)
-        heapcopy = copy.deepcopy(self._heap)
-        return [heapq.heappop(heapcopy) for _ in range(heapsize)]
-
-
 class Column(object):
     """Summarizes a single column of a table, without assumptions about sortedness."""
     def __init__(self, number=1, name='column_name', values_are_lists=False):
