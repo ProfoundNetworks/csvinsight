@@ -94,8 +94,6 @@ def _process_full(reader, args):
         reader, list_columns=args.list_fields, list_separator=args.list_separator
     )
 
-    sys.stdout.write(json.dumps(histogram, sort_keys=True) + '\n')
-
     pool = multiprocessing.Pool(processes=args.subprocesses)
     results = pool.map(summarize.sort_and_summarize, paths)
 
