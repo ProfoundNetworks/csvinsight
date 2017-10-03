@@ -110,7 +110,7 @@ def _override_config(fin, args):
     args.list_fields = config.get('list_fields', args.list_fields)
 
 
-def main():
+def parse_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument('--subprocesses', type=int, default=multiprocessing.cpu_count())
     parser.add_argument('--file', default=None)
@@ -118,14 +118,19 @@ def main():
     parser.add_argument('--quick', action='store_true')
     _add_default_args(parser)
     _add_map_args(parser)
-    args = parser.parse_args()
+    return parser.parse_args(args)
+
+
+def main(argv=sys.argv[1:], stdin=sys.stdin, stdout=sys.stdout):
+    args = parse_args(argv)
+    _LOGGER.debug('args: %r', args)
 
     logging.basicConfig(level=args.loglevel)
 
     if args.file:
         stream = open(args.file)
     else:
-        stream = sys.stdin
+        stream = stdin
 
     if args.config:
         with open(args.config) as fin:
@@ -139,10 +144,10 @@ def main():
     else:
         header, histogram, results = _process_full(reader, args)
 
-    _print_header(histogram, sys.stdout)
+    _print_header(histogram, stdout)
     for number, (name, result) in enumerate(zip(header, results), 1):
         result.update(number=number, name=name)
-        _print_column_summary(result, sys.stdout)
+        _print_column_summary(result, stdout)
 
 
 def main_split():
