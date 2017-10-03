@@ -32,13 +32,13 @@ You can either clone the public repository:
 
 .. code-block:: console
 
-    $ git clone git://github.com/mpenkov/csvinsight
+    $ git clone git://github.com/ProfoundNetworks/csvinsight
 
 Or download the `tarball`_:
 
 .. code-block:: console
 
-    $ curl  -OL https://github.com/mpenkov/csvinsight/tarball/master
+    $ curl  -OL https://github.com/ProfoundNetworks/csvinsight/tarball/master
 
 Once you have a copy of the source, you can install it with:
 
@@ -47,5 +47,5 @@ Once you have a copy of the source, you can install it with:
     $ python setup.py install
 
 
-.. _Github repo: https://github.com/mpenkov/csvinsight
-.. _tarball: https://github.com/mpenkov/csvinsight/tarball/master
+.. _Github repo: https://github.com/ProfoundNetworks/csvinsight
+.. _tarball: https://github.com/ProfoundNetworks/csvinsight/tarball/master
