@@ -8,11 +8,12 @@ def test_summarize_sorted():
     expected = {
         'num_values': 8,
         'num_fills': 7,
-        'fill_ratio': 7./8,
+        'fill_rate': 700./8,
         'max_len': 2,
         'min_len': 0,
         'avg_len': 1.0,
-        'num_uniques': 5
+        'num_uniques': 5,
+        'most_common': [(3, '3'), (2, '2'), (1, 'aa'), (1, '1'), (1, '')],
     }
     assert csvinsight.summarize.summarize_sorted(column) == expected
 
