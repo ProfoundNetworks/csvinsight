@@ -38,10 +38,8 @@ setup(
     entry_points={
         'console_scripts': [
             'csvi=csvinsight.cli:main',
-            'csvi_map=csvinsight.cli:main_map',
-            'csvi_reduce=csvinsight.cli:main_reduce',
             'csvi_split=csvinsight.cli:main_split',
-            'csvi_summarize=csvinsight.cli:main_summarize',
+            'csvi_sum=csvinsight.cli:main_summarize',
         ]
     },
     include_package_data=True,
