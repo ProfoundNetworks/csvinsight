@@ -92,9 +92,18 @@ def _open_file(column_name=None, mode='wb', output_dir=None, suffix=None):
     return gzip.open(P.join(output_dir, column_name + '.' + suffix), mode)
 
 
-def map(fin, list_fields=[], delimiter=_DELIMITER, list_separator=_LIST_SEPARATOR):
+def csv_reader(fin, **kwargs):
+    """A primitive CSV reader."""
+    delimiter = kwargs.get('delimiter', _DELIMITER)
+    for line in fin:
+        yield line.rstrip(b'\n').split(delimiter)
+
+
+def map(fin, reader_function=csv_reader, list_fields=[], delimiter=_DELIMITER,
+        list_separator=_LIST_SEPARATOR):
     output_dir = _create_output_dir()
-    header = fin.readline().rstrip().split(delimiter)
+    reader = reader_function(fin)
+    header = next(reader)
     _LOGGER.info('header: %r', header)
 
     line_queue = multiprocessing.Queue(_NUM_WORKERS * 1000)

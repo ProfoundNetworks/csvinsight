@@ -40,6 +40,7 @@ setup(
             'csvi=csvinsight.cli:main',
             'csvi_map=csvinsight.cli:main_map',
             'csvi_reduce=csvinsight.cli:main_reduce',
+            'csvi_split=csvinsight.cli:main_split',
         ]
     },
     include_package_data=True,

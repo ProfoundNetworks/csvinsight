@@ -7,12 +7,16 @@
 from __future__ import print_function
 
 import argparse
+import csv
+import json
 import logging
+import multiprocessing
+import os
 import sys
 
-import json
-
 from . import csvinsight
+from . import split
+from . import summarize
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,6 +26,8 @@ def _add_default_args(parser):
 
 
 def _add_map_args(parser):
+    parser.add_argument('--delimiter', default='|')
+    parser.add_argument('--list-separator', default=';')
     parser.add_argument('--list-fields', nargs='*', default=[])
 
 
@@ -51,26 +57,47 @@ def main_reduce():
 
 
 def main():
-    """Main console script for csvinsight."""
     parser = argparse.ArgumentParser()
-    parser.add_argument('--simple', action='store_true')
-    parser.add_argument('--delimiter', default='|')
-    parser.add_argument('--list-separator', default=';')
+    parser.add_argument('--subprocesses', type=int, default=multiprocessing.cpu_count())
     _add_default_args(parser)
     _add_map_args(parser)
     args = parser.parse_args()
 
     logging.basicConfig(level=args.loglevel)
 
-    map_kwargs = {'list_fields': args.list_fields, 'delimiter': args.delimiter,
-                  'list_separator': args.list_separator}
-    _LOGGER.info('map_kwargs: %r', map_kwargs)
-    if args.simple:
-        report = csvinsight.simple_report(sys.stdin, **map_kwargs)
-    else:
-        report = csvinsight.full_report(sys.stdin, map_kwargs=map_kwargs)
-    _LOGGER.info('finished reduce, formatting report')
-    csvinsight.print_report(report, sys.stdout)
+    reader = csv.reader(sys.stdin, delimiter=args.delimiter, quoting=csv.QUOTE_NONE,
+                        escapechar='')
+    header, histogram, paths = split.split(
+        reader, list_columns=args.list_fields, list_separator=args.list_separator
+    )
+
+    sys.stdout.write(json.dumps(histogram, sort_keys=True) + '\n')
+
+    pool = multiprocessing.Pool(processes=args.subprocesses)
+    results = pool.map(summarize.sort_and_summarize, paths)
+
+    for column, path, result in zip(header, paths, results):
+        result['_id'] = column
+        sys.stdout.write(json.dumps(result, sort_keys=True) + '\n')
+        os.unlink(path)
+
+
+def main_split():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--delimiter', default='|')
+    _add_default_args(parser)
+    _add_map_args(parser)
+    args = parser.parse_args()
+
+    logging.basicConfig(level=args.loglevel)
+
+    reader = csv.reader(sys.stdin, delimiter=args.delimiter, quoting=csv.QUOTE_NONE,
+                        escapechar='')
+    header, histogram, paths = split.split(
+        reader, list_columns=args.list_fields, list_separator=args.list_separator
+    )
+    for column, path in zip(header, paths):
+        print(column, path)
 
 
 if __name__ == "__main__":
