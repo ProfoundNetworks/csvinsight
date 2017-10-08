@@ -3,6 +3,7 @@ from __future__ import division
 import copy
 import distutils.spawn
 import heapq
+import multiprocessing
 import pipes
 import sys
 import tempfile
@@ -88,7 +89,7 @@ def _get_exe(*preference):
             return path
 
 
-def sort_and_summarize(path, path_is_gzipped=True, compress_temporary=True):
+def sort_and_summarize(path, path_is_gzipped=True, compress_temporary=True, buffer_size='4G'):
     #
     # pigz is faster than gzip and therefore better.
     # gsort is always more complete than sort in some environments e.g. macOS
@@ -98,7 +99,9 @@ def sort_and_summarize(path, path_is_gzipped=True, compress_temporary=True):
     template = pipes.Template()
     if path_is_gzipped:
         template.append('%s --decompress --stdout' % gzip_exe, '--')
-    sort_cmd = 'LC_ALL=C %s --temporary-directory=%s' % (sort_exe, tempfile.tempdir)
+    sort_args = (sort_exe, tempfile.tempdir, multiprocessing.cpu_count(), buffer_size)
+    sort_cmd = ('LC_ALL=C %s --temporary-directory=%s '
+                '--parallel=%s --buffer-size=%s') % sort_args
     if compress_temporary:
         sort_cmd += ' --compress-program=%s' % gzip_exe
     template.append(sort_cmd, '--')
