@@ -7,8 +7,14 @@ import pipes
 import sys
 import tempfile
 
+import six
+
+if six.PY2:
+    NEWLINE = b'\n'
+else:
+    NEWLINE = u'\n'
+
 MOST_COMMON = 20
-BLANK = b''
 
 
 def run_length_encode(iterator):
@@ -48,12 +54,12 @@ def summarize_sorted(iterator):
     num_uniques = 0
     num_empty = 0
     max_len = 0
-    min_len = sys.maxint
+    min_len = sys.maxsize
     sum_len = 0
     topn = TopN()
 
     for run_value, run_length in run_length_encode(iterator):
-        if run_value == BLANK:
+        if len(run_value) == 0:
             num_empty = run_length
         num_values += run_length
         num_uniques += 1
@@ -97,5 +103,5 @@ def sort_and_summarize(path, path_is_gzipped=True, compress_temporary=True):
         sort_cmd += ' --compress-program=%s' % gzip_exe
     template.append(sort_cmd, '--')
     with template.open(path, 'r') as fin:
-        result = summarize_sorted(line.rstrip(b'\n') for line in fin)
+        result = summarize_sorted(line.rstrip(NEWLINE) for line in fin)
     return result

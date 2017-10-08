@@ -5,6 +5,7 @@
 
 """Console script for csvinsight."""
 from __future__ import print_function
+from __future__ import unicode_literals
 
 import argparse
 import csv
@@ -68,14 +69,6 @@ def _print_column_summary(summary, fout):
     for count, value in summary['most_common']:
         if value == '':
             value = 'NULL'
-        #
-        # The json.dumps in reduce_main can cause some encoding weirdness, so
-        # deal with it here.
-        #
-        try:
-            value = value.encode('utf-8', errors='replace')
-        except UnicodeError:
-            value = repr(value)
         print(
             fmt_str3.format(
                 str(count).ljust(10), count * 100.0 / num_samples, value
@@ -140,8 +133,7 @@ def main(argv=sys.argv[1:], stdin=sys.stdin, stdout=sys.stdout):
             _override_config(fin, args)
     _LOGGER.info('args: %r', args)
 
-    reader = csv.reader(stream, delimiter=args.delimiter, quoting=csv.QUOTE_NONE,
-                        escapechar='')
+    reader = _open_csv(stream, delimiter=args.delimiter)
     if args.quick:
         raise NotImplementedError
     else:
@@ -153,6 +145,12 @@ def main(argv=sys.argv[1:], stdin=sys.stdin, stdout=sys.stdout):
         _print_column_summary(result, stdout)
 
 
+def _open_csv(stream, delimiter):
+    if six.PY2:
+        delimiter = six.binary_type(delimiter)
+    return csv.reader(stream, delimiter=delimiter, quoting=csv.QUOTE_NONE, escapechar=None)
+
+
 def main_split():
     parser = argparse.ArgumentParser()
     _add_default_args(parser)
@@ -162,8 +160,7 @@ def main_split():
     logging.basicConfig(level=args.loglevel)
     tempfile.tempdir = args.tempdir
 
-    reader = csv.reader(sys.stdin, delimiter=args.delimiter, quoting=csv.QUOTE_NONE,
-                        escapechar='')
+    reader = _open_csv(sys.stdin, args.delimiter)
     header, histogram, paths = split.split(
         reader, list_columns=args.list_fields, list_separator=args.list_separator
     )
@@ -177,8 +174,8 @@ def main_summarize():
     args = parser.parse_args()
     logging.basicConfig(level=args.loglevel)
 
-    summary = summarize.summarize_sorted(line.rstrip(b'\n') for line in sys.stdin)
-    print(json.dumps(summary) + b'\n')
+    summary = summarize.summarize_sorted(line.rstrip(summarize.NEWLINE) for line in sys.stdin)
+    print(json.dumps(summary) + summarize.NEWLINE)
 
 
 if __name__ == "__main__":
