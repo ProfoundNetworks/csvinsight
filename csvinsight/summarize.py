@@ -1,9 +1,11 @@
 """Summarize a single column of values."""
 from __future__ import division
 import copy
+import distutils.spawn
 import heapq
 import pipes
 import sys
+import tempfile
 
 MOST_COMMON = 20
 BLANK = b''
@@ -73,11 +75,27 @@ def summarize_sorted(iterator):
     }
 
 
-def sort_and_summarize(path, gunzip=True):
+def _get_exe(*preference):
+    for exe in preference:
+        path = distutils.spawn.find_executable(exe)
+        if path:
+            return path
+
+
+def sort_and_summarize(path, path_is_gzipped=True, compress_temporary=True):
+    #
+    # pigz is faster than gzip and therefore better.
+    # gsort is always more complete than sort in some environments e.g. macOS
+    #
+    gzip_exe = _get_exe('pigz', 'gzip')
+    sort_exe = _get_exe('gsort', 'sort')
     template = pipes.Template()
-    if gunzip:
-        template.append('gunzip -c', '--')
-    template.append('LC_ALL=C sort', '--')
+    if path_is_gzipped:
+        template.append('%s --decompress --stdout' % gzip_exe, '--')
+    sort_cmd = 'LC_ALL=C %s --temporary-directory=%s' % (sort_exe, tempfile.tempdir)
+    if compress_temporary:
+        sort_cmd += ' --compress-program=%s' % gzip_exe
+    template.append(sort_cmd, '--')
     with template.open(path, 'r') as fin:
         result = summarize_sorted(line.rstrip(b'\n') for line in fin)
     return result

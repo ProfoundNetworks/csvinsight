@@ -13,6 +13,7 @@ import logging
 import multiprocessing
 import os
 import sys
+import tempfile
 import yaml
 
 import six
@@ -25,6 +26,7 @@ _LOGGER = logging.getLogger(__name__)
 
 def _add_default_args(parser):
     parser.add_argument('--loglevel', default=logging.INFO)
+    parser.add_argument('--tempdir', default=tempfile.gettempdir())
 
 
 def _add_map_args(parser):
@@ -125,6 +127,7 @@ def main(argv=sys.argv[1:], stdin=sys.stdin, stdout=sys.stdout):
     args = parse_args(argv)
     _LOGGER.debug('args: %r', args)
 
+    tempfile.tempdir = args.tempdir
     logging.basicConfig(level=args.loglevel)
 
     if args.file:
@@ -157,6 +160,7 @@ def main_split():
     args = parser.parse_args()
 
     logging.basicConfig(level=args.loglevel)
+    tempfile.tempdir = args.tempdir
 
     reader = csv.reader(sys.stdin, delimiter=args.delimiter, quoting=csv.QUOTE_NONE,
                         escapechar='')
