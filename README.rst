@@ -6,8 +6,9 @@ csvinsight
 .. image:: https://img.shields.io/pypi/v/csvinsight.svg
         :target: https://pypi.python.org/pypi/csvinsight
 
-.. image:: https://img.shields.io/travis/mpenkov/csvinsight.svg
-        :target: https://travis-ci.org/mpenkov/csvinsight
+.. image:: https://circleci.com/gh/ProfoundNetworks/csvinsight.svg?style=shield&circle-token=:circle-token
+        :target: https://circleci.com/gh/ProfoundNetworks/csvinsight
+        :alt: Build Status
 
 .. image:: https://readthedocs.org/projects/csvinsight/badge/?version=latest
         :target: https://csvinsight.readthedocs.io/en/latest/?badge=latest
