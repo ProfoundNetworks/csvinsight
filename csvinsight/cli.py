@@ -20,6 +20,7 @@ import yaml
 import six
 
 from . import split
+from . import stream
 from . import summarize
 
 _LOGGER = logging.getLogger(__name__)
@@ -118,7 +119,7 @@ def parse_args(args):
     parser.add_argument('--subprocesses', type=int, default=multiprocessing.cpu_count())
     parser.add_argument('--file', default=None)
     parser.add_argument('--config', default=None)
-    parser.add_argument('--quick', action='store_true')
+    parser.add_argument('--stream', action='store_true')
     parser.add_argument('--in-memory', action='store_true')
     _add_default_args(parser)
     _add_map_args(parser)
@@ -133,18 +134,20 @@ def main(argv=sys.argv[1:], stdin=sys.stdin, stdout=sys.stdout):
     logging.basicConfig(level=args.loglevel)
 
     if args.file:
-        stream = open(args.file)
+        in_stream = open(args.file)
     else:
-        stream = stdin
+        in_stream = stdin
 
     if args.config:
         with open(args.config) as fin:
             _override_config(fin, args)
     _LOGGER.info('args: %r', args)
 
-    reader = _open_csv(stream, delimiter=args.delimiter)
-    if args.quick:
-        raise NotImplementedError
+    reader = _open_csv(in_stream, delimiter=args.delimiter)
+    if args.stream:
+        header, histogram, results = stream.read(
+            reader, list_columns=args.list_fields, list_separator=args.list_separator
+        )
     elif args.in_memory:
         header, histogram, results = _run_in_memory(reader, args)
     else:
