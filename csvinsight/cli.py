@@ -98,6 +98,14 @@ def _process_full(reader, args):
     return header, histogram, results
 
 
+def _run_in_memory(reader, args):
+    header, histogram, columns = split.split_in_memory(
+        reader, list_columns=args.list_fields, list_separator=args.list_separator
+    )
+    column_summaries = [summarize.summarize_sorted(iter(sorted(col))) for col in columns]
+    return header, histogram, column_summaries
+
+
 def _override_config(fin, args):
     config = yaml.load(fin)
     args.delimiter = config.get('delimiter', args.delimiter)
@@ -111,6 +119,7 @@ def parse_args(args):
     parser.add_argument('--file', default=None)
     parser.add_argument('--config', default=None)
     parser.add_argument('--quick', action='store_true')
+    parser.add_argument('--in-memory', action='store_true')
     _add_default_args(parser)
     _add_map_args(parser)
     return parser.parse_args(args)
@@ -136,6 +145,8 @@ def main(argv=sys.argv[1:], stdin=sys.stdin, stdout=sys.stdout):
     reader = _open_csv(stream, delimiter=args.delimiter)
     if args.quick:
         raise NotImplementedError
+    elif args.in_memory:
+        header, histogram, results = _run_in_memory(reader, args)
     else:
         header, histogram, results = _process_full(reader, args)
 
