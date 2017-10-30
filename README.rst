@@ -14,8 +14,8 @@ csvinsight
         :target: https://csvinsight.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
-.. image:: https://pyup.io/repos/github/mpenkov/csvinsight/shield.svg
-     :target: https://pyup.io/repos/github/mpenkov/csvinsight/
+.. image:: https://pyup.io/repos/github/ProfoundNetworks/csvinsight/shield.svg
+     :target: https://pyup.io/repos/github/ProfoundNetworks/csvinsight/
      :alt: Updates
 
 

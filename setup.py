@@ -32,8 +32,8 @@ setup(
     description="Fast & simple summary for large CSV files",
     long_description=readme + '\n\n' + history,
     author="Michael Penkov",
-    author_email='mpenkov@profound.net',
-    url='https://github.com/mpenkov/csvinsight',
+    author_email='misha.penkov@gmail.com',
+    url='https://github.com/ProfoundNetworks/csvinsight',
     packages=find_packages(include=['csvinsight']),
     entry_points={
         'console_scripts': [
