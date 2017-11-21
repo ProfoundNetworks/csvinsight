@@ -191,6 +191,11 @@ def main_multi(stdout=sys.stdout):
 
 def _split_file(path, delimiter=None, list_columns=None, list_separator=None,
                 header=None):
+    """Split a CSV file into columns, one column per file.
+
+    Returns the header, the row length histogram, and the paths of the files
+    storing each column.
+    """
     #
     # This is here because:
     #
@@ -207,6 +212,18 @@ def _split_file(path, delimiter=None, list_columns=None, list_separator=None,
 
 
 def _process_multi(args):
+    """Process multiple files as multiple subprocesses.
+
+    The multiple processes come in handy for:
+
+        1. Splitting the files into columns
+        2. Sorting each column
+
+    Assumes the files contain the same columns.
+
+    Returns a header, the row length histogram, and a dictionary summary of the
+    results.
+    """
     #
     # Use multiple processes for splitting the N input files.
     # This gives us N sets of M columns.
@@ -235,23 +252,52 @@ def _process_multi(args):
     return headers[0], agg_histogram, results
 
 
+def _check_headers(headers):
+    for h in headers:
+        if h != headers[0]:
+            raise ValueError('the files contain different headers')
+
+
 def _aggregate_histograms(histograms):
+    """Aggregate multiple histograms into one.
+
+    A single histogram just contains the number of times each row length
+    occurred in the dataset.
+
+    :arg list histograms: The histograms, as collections.Counter objects.
+    :returns: A histogram
+    :rtype: collections.Counter
+    """
     aggregated = collections.Counter()
     for hist in histograms:
         aggregated.update(hist)
     return aggregated
 
 
-def _aggregate_paths(paths):
-    """Paths is list of dictionaries column_names -> paths."""
-    num_columns = len(paths[0])
-    for p in paths:
-        if not len(p) == num_columns:
-            raise ValueError('number of columns must be the same for each file')
+def _aggregate_paths(tables):
+    """Concatenate the tables together to form one big table.
+
+    Each table is a list of columns, where a column is stored in a separate
+    file.  To create the big table, this function concatenates the respective
+    columns together.
+
+    Each table must contain the same number of columns for this to work.
+
+    Deletes the files from the individual tables after concatenating.
+
+    :arg list tables: A list of tables.
+    :returns: A table, as a list of concatenated columns.
+    :rtype: list
+    :raises ValueError: if the tables contain a different number of columns
+    """
+    num_columns = len(tables[0])
+    for tbl in tables:
+        if not len(tbl) == num_columns:
+            raise ValueError('number of columns must be the same for each table')
 
     concat_paths = []
     for column_number in range(num_columns):
-        concat_paths.append(_concatenate([p[column_number] for p in paths]))
+        concat_paths.append(_concatenate([tbl[column_number] for tbl in tables]))
 
     return concat_paths
 
