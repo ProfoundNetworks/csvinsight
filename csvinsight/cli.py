@@ -115,6 +115,7 @@ def _override_config(fin, args):
     args.delimiter = config.get('delimiter', args.delimiter)
     args.list_separator = config.get('list_separator', args.list_separator)
     args.list_fields = config.get('list_fields', args.list_fields)
+    args.header = config.get('header')
 
 
 def parse_args(args):
@@ -188,7 +189,8 @@ def main_multi(stdout=sys.stdout):
         _print_column_summary(result, stdout)
 
 
-def _split_file(path, delimiter=None, list_columns=None, list_separator=None):
+def _split_file(path, delimiter=None, list_columns=None, list_separator=None,
+                header=None):
     #
     # This is here because:
     #
@@ -200,7 +202,8 @@ def _split_file(path, delimiter=None, list_columns=None, list_separator=None):
     assert list_separator
     with open(path, 'rb' if six.PY2 else 'r') as fin:
         reader = _open_csv(fin, delimiter)
-        return split.split(reader, list_columns=list_columns, list_separator=list_separator)
+        return split.split(reader, list_columns=list_columns,
+                           list_separator=list_separator, header=header)
 
 
 def _process_multi(args):
@@ -212,7 +215,7 @@ def _process_multi(args):
     #
     my_split = functools.partial(
         _split_file, delimiter=args.delimiter, list_columns=args.list_fields,
-        list_separator=args.list_separator
+        list_separator=args.list_separator, header=args.header
     )
     pool = multiprocessing.Pool(processes=args.subprocesses)
     #

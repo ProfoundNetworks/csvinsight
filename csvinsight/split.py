@@ -102,11 +102,13 @@ def populate_queues(header, reader, queues,
     return histogram
 
 
-def split(reader, open_file=open_temp_file, list_columns=[], list_separator=LIST_SEPARATOR):
+def split(reader, open_file=open_temp_file, list_columns=[], list_separator=LIST_SEPARATOR,
+          header=None):
     if six.PY2:
         list_columns = [six.binary_type(col) for col in list_columns]
         list_separator = six.binary_type(list_separator)
-    header = next(reader)
+    if header is None:
+        header = next(reader)
     queues = [Queue.Queue(MAX_QUEUE_SIZE) for _ in header]
     threads = [WriterThread(queue, open_temp=open_temp_file) for queue in queues]
     for thread in threads:
