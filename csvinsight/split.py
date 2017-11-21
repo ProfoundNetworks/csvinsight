@@ -18,6 +18,11 @@ LIST_SEPARATOR = ';'
 TEXT_ENCODING = 'utf-8'
 
 
+def open_temp_file_plain(mode):
+    handle, path = tempfile.mkstemp()
+    return os.fdopen(handle, mode), path
+
+
 def open_temp_file(mode):
     handle, path = tempfile.mkstemp(suffix='.gz')
     return gzip.GzipFile(fileobj=os.fdopen(handle, mode), mode=mode), path
