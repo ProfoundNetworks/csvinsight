@@ -5,6 +5,7 @@ import collections
 import functools
 import gzip
 import os
+import random
 import tempfile
 import threading
 
@@ -18,22 +19,20 @@ LIST_SEPARATOR = ';'
 TEXT_ENCODING = 'utf-8'
 
 
-def open_temp_file_plain(mode):
-    handle, path = tempfile.mkstemp()
-    return os.fdopen(handle, mode), path
-
-
-def open_temp_file(mode):
-    handle, path = tempfile.mkstemp(suffix='.gz')
+def open_temp_file(mode, prefix='tmp'):
+    handle, path = tempfile.mkstemp(prefix=prefix, suffix='.gz')
     return gzip.GzipFile(fileobj=os.fdopen(handle, mode), mode=mode), path
 
 
 class WriterThread(threading.Thread):
 
-    def __init__(self, queue, open_temp=open_temp_file):
+    def __init__(self, job_id, thread_id, queue, open_temp=open_temp_file):
         super(WriterThread, self).__init__()
+        self._job_id = job_id
+        self._id = thread_id
         self._queue = queue
-        self._fout, self._path = open_temp('wb')
+        prefix = 'csvi-%d-%d-' % (self._job_id, self._id)
+        self._fout, self._path = open_temp('wb', prefix=prefix)
         self.write = self._write_py2 if six.PY2 else self._write_py3
 
     def run(self):
@@ -109,8 +108,10 @@ def split(reader, open_file=open_temp_file, list_columns=[], list_separator=LIST
         list_separator = six.binary_type(list_separator)
     if header is None:
         header = next(reader)
+    job_id = random.randint(0, 1000)
     queues = [Queue.Queue(MAX_QUEUE_SIZE) for _ in header]
-    threads = [WriterThread(queue, open_temp=open_temp_file) for queue in queues]
+    threads = [WriterThread(job_id, i, queue, open_temp=open_temp_file)
+               for i, queue in enumerate(queues)]
     for thread in threads:
         thread.start()
 
