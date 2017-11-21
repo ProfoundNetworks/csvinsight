@@ -235,16 +235,26 @@ def _process_multi(args):
         list_separator=args.list_separator, header=args.header
     )
     pool = multiprocessing.Pool(processes=args.subprocesses)
+
     #
     # each result consists of header, histogram and paths
     #
     results = pool.map(my_split, args.files)
     headers, histograms, paths = zip(*results)
 
+    _check_headers(headers)
     agg_histogram = _aggregate_histograms(histograms)
     agg_paths = _aggregate_paths(paths)
 
-    results = pool.map(summarize.sort_and_summarize, agg_paths)
+    #
+    # We're already running sort_and_summarize in multiple subprocesses, so
+    # disable parallelization in that function (num_subprocesses=1).
+    #
+    my_sort = functools.partial(
+        summarize.sort_and_summarize, path_is_gzipped=True,
+        compress_temporary=True, num_subprocesses=1
+    )
+    results = pool.map(my_sort, agg_paths)
 
     for path in agg_paths:
         os.unlink(path)
