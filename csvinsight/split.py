@@ -19,20 +19,44 @@ LIST_SEPARATOR = ';'
 TEXT_ENCODING = 'utf-8'
 
 
-def open_temp_file(mode, prefix='tmp'):
+def _open_temp_file(mode, prefix='tmp'):
+    """Open a gzipped temporary file.  Returns the file object and path."""
     handle, path = tempfile.mkstemp(prefix=prefix, suffix='.gz')
     return gzip.GzipFile(fileobj=os.fdopen(handle, mode), mode=mode), path
 
 
 class WriterThread(threading.Thread):
+    """Reads column values from a queue and writes them to a temporary file.
 
-    def __init__(self, job_id, thread_id, queue, open_temp=open_temp_file):
+    Prefixes the temporary file name with 'csvi-{file_id}-{column_id}-' in case
+    you ever need to peek into the files by yourself.
+
+    :arg int file_id:
+    :arg int column_id:
+    :arg Queue.Queue queue: The queue to read from
+    :arg open_temp: A callback for opening a temporary file.
+    """
+    def __init__(self, file_id, column_id, queue, open_temp=_open_temp_file):
         super(WriterThread, self).__init__()
-        self._job_id = job_id
-        self._id = thread_id
+        self._file_id = file_id
+        self._column_id = column_id
         self._queue = queue
-        prefix = 'csvi-%d-%d-' % (self._job_id, self._id)
+        prefix = 'csvi-%d-%d-' % (self._file_id, self._column_id)
         self._fout, self._path = open_temp('wb', prefix=prefix)
+
+        #
+        # This works around a Py2 vs Py3 sticking point.
+        #
+        #   1. Py2 CSV readers output bytes.
+        #   2. Py3 CSV readers output strings.
+        #   3. We want bytes in our output to preserve the content of the
+        #      original file.
+        #
+        # A more elegant solution would be to use backports.csv for Py2, but
+        # that is quite slow when it comes to decoding Unicode.  Since we just
+        # want to split, and not necessarily decode Unicode, we use this ugly
+        # work-around instead.
+        #
         self.write = self._write_py2 if six.PY2 else self._write_py3
 
     def run(self):
@@ -51,7 +75,7 @@ class WriterThread(threading.Thread):
         self._fout.write(('\n'.join(lines) + '\n').encode(TEXT_ENCODING))
 
 
-def make_batches(iterable, batch_size=DEFAULT_BATCH_SIZE):
+def _make_batches(iterable, batch_size=DEFAULT_BATCH_SIZE):
     batch = []
     for row in iterable:
         if len(batch) == batch_size:
@@ -79,12 +103,29 @@ def _build_extractors(header, list_columns, list_separator):
     ]
 
 
-def populate_queues(header, reader, queues,
-                    list_columns=[], list_separator=LIST_SEPARATOR):
+def _populate_queues(header, reader, queues,
+                     list_columns=[], list_separator=LIST_SEPARATOR):
+    """Push columns of a csv.Reader into the queues.
+
+    :arg list header: The CSV header - names of the columns.
+    :arg csv.Reader reader: The csv.Reader to read from.
+    :arg list queues: A list of queues to write to, one queue per column.
+    :arg list list_columns:
+    :arg str list_separator:
+    :returns: A histogram of row lengths
+    :rtype: collections.Counter
+
+    The histogram shows the number times each row length was encountered.
+    Ideally, all rows would be the same length as the header, but not all CSV
+    is like that.
+    """
+    if len(header) != len(queues):
+        raise ValueError('expected one queue per column')
+
     histogram = collections.Counter()
     extractors = _build_extractors(header, list_columns, list_separator)
 
-    for batch in make_batches(reader):
+    for batch in _make_batches(reader):
         histogram.update(len(row) for row in batch)
         columns = [list() for _ in header]
         for row in batch:
@@ -101,22 +142,39 @@ def populate_queues(header, reader, queues,
     return histogram
 
 
-def split(reader, open_file=open_temp_file, list_columns=[], list_separator=LIST_SEPARATOR,
-          header=None):
+def split(reader, open_file=_open_temp_file,
+          list_columns=[], list_separator=LIST_SEPARATOR, header=None):
+    """Split a CSV reader into columns, one column per temporary file.
+
+    :arg csv.Reader reader: The reader to split.
+    :arg open_file: A callback for opening temporary files.
+    :arg list list_columns: Column names to treat as containing lists
+    :arg str list_separator: The separator to use when splitting lists
+    :arg list header: The column names to assume.  If None, reads them from the
+        first row of the reader.
+    :returns: header, histogram, values for each columns
+    :rtype: tuple of (list, collections.Counter, list of lists)
+
+    This function returns three things:
+
+        1. The header
+        2. A histogram of row lengths
+        3. A list of paths to temporary files, in the same order as the columns.
+    """
     if six.PY2:
         list_columns = [six.binary_type(col) for col in list_columns]
         list_separator = six.binary_type(list_separator)
     if header is None:
         header = next(reader)
-    job_id = random.randint(0, 1000)
+    file_id = random.randint(0, 1000)
     queues = [Queue.Queue(MAX_QUEUE_SIZE) for _ in header]
-    threads = [WriterThread(job_id, i, queue, open_temp=open_temp_file)
+    threads = [WriterThread(file_id, i, queue, open_temp=_open_temp_file)
                for i, queue in enumerate(queues)]
     for thread in threads:
         thread.start()
 
-    histogram = populate_queues(header, reader, queues,
-                                list_columns=list_columns, list_separator=list_separator)
+    histogram = _populate_queues(header, reader, queues,
+                                 list_columns=list_columns, list_separator=list_separator)
 
     for queue in queues:
         queue.join()
