@@ -2,7 +2,6 @@
 from __future__ import unicode_literals
 
 import collections
-import functools
 import gzip
 import os
 import random
@@ -86,25 +85,8 @@ def _make_batches(iterable, batch_size=DEFAULT_BATCH_SIZE):
         yield batch
 
 
-def _extract_value(value):
-    yield value
-
-
-def _extract_list(value, list_separator=LIST_SEPARATOR):
-    for subvalue in value.split(list_separator):
-        yield subvalue
-
-
-def _build_extractors(header, list_columns, list_separator):
-    extract_list = functools.partial(_extract_list, list_separator=list_separator)
-    return [
-        extract_list if column in list_columns else _extract_value
-        for column in header
-    ]
-
-
-def _populate_queues(header, reader, queues,
-                     list_columns=[], list_separator=LIST_SEPARATOR):
+def _populate_queues(header, reader, queues, list_columns=[],
+                     list_separator=LIST_SEPARATOR, batch_size=DEFAULT_BATCH_SIZE):
     """Push columns of a csv.Reader into the queues.
 
     :arg list header: The CSV header - names of the columns.
@@ -112,6 +94,7 @@ def _populate_queues(header, reader, queues,
     :arg list queues: A list of queues to write to, one queue per column.
     :arg list list_columns:
     :arg str list_separator:
+    :arg int batch_size: The maximum number of rows to process as a single batch.
     :returns: A histogram of row lengths
     :rtype: collections.Counter
 
@@ -123,17 +106,24 @@ def _populate_queues(header, reader, queues,
         raise ValueError('expected one queue per column')
 
     histogram = collections.Counter()
-    extractors = _build_extractors(header, list_columns, list_separator)
+    list_column_numbers = [i for (i, name) in enumerate(header) if name in list_columns]
+    nonlist_column_numbers = [i for (i, name) in enumerate(header) if name not in list_columns]
+    assert len(list_column_numbers) + len(nonlist_column_numbers) == len(header)
 
-    for batch in _make_batches(reader):
+    #
+    # We put batches on the queue, not the actual values themselves.
+    # This reduces the overhead (number of calls to Queue.put and .get).
+    #
+    for batch in _make_batches(reader, batch_size=batch_size):
         histogram.update(len(row) for row in batch)
         columns = [list() for _ in header]
         for row in batch:
             if len(header) != len(row):
                 continue
-            for col_num, value in enumerate(row):
-                for subvalue in extractors[col_num](value):
-                    columns[col_num].append(subvalue)
+            for col_num in list_column_numbers:
+                columns[col_num].extend(row[col_num].split(list_separator))
+            for col_num in nonlist_column_numbers:
+                columns[col_num].append(row[col_num])
         for queue, values in zip(queues, columns):
             queue.put(values)
 
