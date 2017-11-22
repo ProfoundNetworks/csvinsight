@@ -39,8 +39,6 @@ setup(
         'console_scripts': [
             'csvi=csvinsight.cli:main',
             'csvim=csvinsight.cli:main_multi',
-            'csvi_split=csvinsight.cli:main_split',
-            'csvi_sum=csvinsight.cli:main_summarize',
         ]
     },
     include_package_data=True,

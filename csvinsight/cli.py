@@ -11,7 +11,6 @@ import argparse
 import csv
 import collections
 import functools
-import json
 import logging
 import multiprocessing
 import os
@@ -334,33 +333,6 @@ def _open_csv(stream, delimiter):
     if six.PY2:
         delimiter = six.binary_type(delimiter)
     return csv.reader(stream, delimiter=delimiter, quoting=csv.QUOTE_NONE, escapechar=None)
-
-
-def main_split():
-    parser = argparse.ArgumentParser()
-    _add_default_args(parser)
-    _add_map_args(parser)
-    args = parser.parse_args()
-
-    logging.basicConfig(level=args.loglevel)
-    tempfile.tempdir = args.tempdir
-
-    reader = _open_csv(sys.stdin, args.delimiter)
-    header, histogram, paths = split.split(
-        reader, list_columns=args.list_fields, list_separator=args.list_separator
-    )
-    for column, path in zip(header, paths):
-        print(column, path)
-
-
-def main_summarize():
-    parser = argparse.ArgumentParser()
-    _add_default_args(parser)
-    args = parser.parse_args()
-    logging.basicConfig(level=args.loglevel)
-
-    summary = summarize.summarize_sorted(line.rstrip(summarize.NEWLINE) for line in sys.stdin)
-    print(json.dumps(summary) + summarize.NEWLINE)
 
 
 if __name__ == "__main__":
