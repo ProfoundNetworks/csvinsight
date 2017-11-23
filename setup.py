@@ -12,6 +12,7 @@ with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
 requirements = [
+    'plumbum',
     'pyyaml',
     'six',
 ]
@@ -22,6 +23,7 @@ setup_requirements = [
 ]
 
 test_requirements = [
+    'mock',
     'pytest',
     # TODO: put package test requirements here
 ]
@@ -38,7 +40,6 @@ setup(
     entry_points={
         'console_scripts': [
             'csvi=csvinsight.cli:main',
-            'csvim=csvinsight.cli:main_multi',
         ]
     },
     include_package_data=True,

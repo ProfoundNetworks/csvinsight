@@ -132,17 +132,16 @@ def _populate_queues(header, reader, queues, list_columns=[],
     return histogram
 
 
-def split(reader, open_file=_open_temp_file,
-          list_columns=[], list_separator=LIST_SEPARATOR, header=None):
+def split(header, reader, open_file=_open_temp_file,
+          list_columns=[], list_separator=LIST_SEPARATOR):
     """Split a CSV reader into columns, one column per temporary file.
 
+    :arg list header: The column names to assume.
     :arg csv.Reader reader: The reader to split.
     :arg open_file: A callback for opening temporary files.
     :arg list list_columns: Column names to treat as containing lists
     :arg str list_separator: The separator to use when splitting lists
-    :arg list header: The column names to assume.  If None, reads them from the
-        first row of the reader.
-    :returns: header, histogram, values for each columns
+    :returns: histogram, values for each columns
     :rtype: tuple of (list, collections.Counter, list of lists)
 
     This function returns three things:
@@ -151,11 +150,11 @@ def split(reader, open_file=_open_temp_file,
         2. A histogram of row lengths
         3. A list of paths to temporary files, in the same order as the columns.
     """
+    if header is None:
+        raise ValueError('header may not be None')
     if six.PY2:
         list_columns = [six.binary_type(col) for col in list_columns]
         list_separator = six.binary_type(list_separator)
-    if header is None:
-        header = next(reader)
     file_id = random.randint(0, 1000)
     queues = [Queue.Queue(MAX_QUEUE_SIZE) for _ in header]
     threads = [WriterThread(file_id, i, queue, open_temp=_open_temp_file)
@@ -169,7 +168,7 @@ def split(reader, open_file=_open_temp_file,
     for queue in queues:
         queue.join()
 
-    return header, histogram, [thread._path for thread in threads]
+    return histogram, [thread._path for thread in threads]
 
 
 def split_in_memory(reader, list_columns=[], list_separator=LIST_SEPARATOR):

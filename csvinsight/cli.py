@@ -4,39 +4,40 @@
 #
 
 """Console script for csvinsight."""
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
 import argparse
 import csv
 import collections
+import distutils.spawn
 import functools
+import gzip
 import logging
 import multiprocessing
 import os
+import os.path as P
 import subprocess
 import sys
 import tempfile
 import yaml
 
+import plumbum
 import six
 
 from . import split
-from . import stream
 from . import summarize
 
 _LOGGER = logging.getLogger(__name__)
+_GZIP_MAGIC = b'\x1f\x8b'
 
 
-def _add_default_args(parser):
-    parser.add_argument('--loglevel', default=logging.INFO)
-    parser.add_argument('--tempdir', default=tempfile.gettempdir())
-
-
-def _add_map_args(parser):
-    parser.add_argument('--delimiter', default='|')
-    parser.add_argument('--list-separator', default=';')
-    parser.add_argument('--list-fields', nargs='*', default=[])
+def _print_report(header, histogram, results, fout=sys.stdout):
+    _print_header(histogram, fout)
+    for number, (name, result) in enumerate(zip(header, results), 1):
+        result.update(number=number, name=name)
+        _print_column_summary(result, fout)
 
 
 def _print_header(histogram, fout):
@@ -87,20 +88,6 @@ def _print_column_summary(summary, fout):
     print('', file=fout)
 
 
-def _process_full(reader, args):
-    header, histogram, paths = split.split(
-        reader, list_columns=args.list_fields, list_separator=args.list_separator
-    )
-
-    pool = multiprocessing.Pool(processes=args.subprocesses)
-    results = pool.map(summarize.sort_and_summarize, paths)
-
-    for path in paths:
-        os.unlink(path)
-
-    return header, histogram, results
-
-
 def _run_in_memory(reader, args):
     header, histogram, columns = split.split_in_memory(
         reader, list_columns=args.list_fields, list_separator=args.list_separator
@@ -114,83 +101,128 @@ def _override_config(fin, args):
     args.delimiter = config.get('delimiter', args.delimiter)
     args.list_separator = config.get('list_separator', args.list_separator)
     args.list_fields = config.get('list_fields', args.list_fields)
-    args.header = config.get('header')
 
 
-def parse_args(args):
-    #
-    # FIXME: args is not being used here
-    #
+def main(stdout=sys.stdout):
     parser = argparse.ArgumentParser()
+    parser.add_argument('path', default=None)
+    parser.add_argument('--loglevel', default=logging.INFO)
+    parser.add_argument('--tempdir', default=tempfile.gettempdir())
     parser.add_argument('--subprocesses', type=int, default=multiprocessing.cpu_count())
-    parser.add_argument('--file', default=None)
     parser.add_argument('--config', default=None)
-    parser.add_argument('--stream', action='store_true')
-    parser.add_argument('--in-memory', action='store_true')
-    _add_default_args(parser)
-    _add_map_args(parser)
-    return parser.parse_args(args)
-
-
-def main(argv=sys.argv[1:], stdin=sys.stdin, stdout=sys.stdout):
-    args = parse_args(argv)
-    _LOGGER.debug('args: %r', args)
-
-    tempfile.tempdir = args.tempdir
-    logging.basicConfig(level=args.loglevel)
-
-    if args.file:
-        in_stream = open(args.file)
-    else:
-        in_stream = stdin
-
-    if args.config:
-        with open(args.config) as fin:
-            _override_config(fin, args)
-    _LOGGER.info('args: %r', args)
-
-    reader = _open_csv(in_stream, delimiter=args.delimiter)
-    if args.stream:
-        header, histogram, results = stream.read(
-            reader, list_columns=args.list_fields, list_separator=args.list_separator
-        )
-    elif args.in_memory:
-        header, histogram, results = _run_in_memory(reader, args)
-    else:
-        header, histogram, results = _process_full(reader, args)
-
-    _print_header(histogram, stdout)
-    for number, (name, result) in enumerate(zip(header, results), 1):
-        result.update(number=number, name=name)
-        _print_column_summary(result, stdout)
-
-
-def main_multi(stdout=sys.stdout):
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--subprocesses', type=int, default=multiprocessing.cpu_count())
-    parser.add_argument('--files', nargs='+')
-    parser.add_argument('--config', default=None)
-    _add_default_args(parser)
-    _add_map_args(parser)
+    parser.add_argument('--delimiter', default='|')
+    parser.add_argument('--list-separator', default=';')
+    parser.add_argument('--list-fields', nargs='*', default=[])
     args = parser.parse_args()
 
     logging.basicConfig(level=args.loglevel)
+    tempfile.tempdir = args.tempdir
 
     if args.config:
         with open(args.config) as fin:
             _override_config(fin, args)
 
-    header, histogram, results = _process_multi(args)
+    if _is_tiny(args.path):
+        header, histogram, results = _run_in_memory(args.path, args)
+    else:
+        header = _read_header(args.path, args.delimiter)
+        part_paths = _split_large_file(args.path)
+        histogram, results = _process_multi(header, part_paths, args)
+        for part in part_paths:
+            os.unlink(part)
 
-    _print_header(histogram, stdout)
-    for number, (name, result) in enumerate(zip(header, results), 1):
-        result.update(number=number, name=name)
-        _print_column_summary(result, stdout)
+    _print_report(header, histogram, results)
 
 
-def _split_file(path, delimiter=None, list_columns=None, list_separator=None,
-                header=None):
+def _read_header(path, delimiter):
+    """Read the CSV header from the first line of the specified file.
+
+    :arg str path: The file to read.
+    :arg str delimiter: The column delimiter.
+    :returns: The header
+    :rtype: list
+    """
+    mode = 'rb' if six.PY2 else 'r'
+
+    def open_path():
+        if _is_gzipped(path):
+            return gzip.GzipFile(path, mode=mode)
+        else:
+            return open(path, mode)
+
+    with open_path() as fin:
+        reader = _open_csv(fin, delimiter)
+        return next(reader)
+
+
+def _is_tiny(path):
+    """Return True if the specified file is small enough to process in memory."""
+    size_in_mib = os.stat(path).st_size / 1e6
+    return (_is_gzipped(path) and size_in_mib < 10) or size_in_mib < 100
+
+
+def _is_gzipped(path):
+    """Returns True if the specified path is a gzipped file."""
+    with open(path, 'rb') as fin:
+        return fin.read(len(_GZIP_MAGIC)) == _GZIP_MAGIC
+
+
+def _split_large_file(path, lines_per_part=100000):
+    """Split a large file into smaller files.
+
+    Uses GNU command-line tools (e.g. gzip, gsplit) under the cover to
+    keep things fast.
+
+    The split result do not include the CSV header.
+    Expects the caller to delete the smaller files when done.
+
+    :arg str path: The full path to the file to split.
+    :arg str lines_per_part: The max number of lines to include in each part.
+    :returns: The path to each part
+    :rtype: list
+    """
+    cat_command = plumbum.local['cat'][path]
+    tail_command = plumbum.local['tail']['-n', '+2']
+
+    gzip_exe = _get_exe('pigz', 'gzip')
+    gzip_command = plumbum.local[gzip_exe]['--decompress', '--stdout', path]
+
+    prefix = tempfile.mkdtemp(prefix='csvi-')
+
+    split_exe = _get_exe('gsplit', 'split')
+    split_flags = ['--filter', "%s > $FILE.gz" % gzip_exe,
+                   '--lines=%s' % lines_per_part, '-', prefix + '/']
+    split_command = plumbum.local[split_exe][split_flags]
+
+    if _is_gzipped(path):
+        chain = gzip_command | tail_command | split_command
+    else:
+        chain = cat_command | tail_command | split_command
+
+    _LOGGER.info('chain: %s', chain)
+    chain()
+
+    full_paths_to_parts = [P.join(prefix, f) for f in os.listdir(prefix)]
+    _LOGGER.info('full_paths_to_parts: %r', full_paths_to_parts)
+    return full_paths_to_parts
+
+
+def _get_exe(*preference):
+    """Return the first available executable in preference."""
+    for exe in preference:
+        path = distutils.spawn.find_executable(exe)
+        if path:
+            return path
+
+
+def _split_file(header, path, delimiter=None, list_columns=None, list_separator=None):
     """Split a CSV file into columns, one column per file.
+
+    :arg str header: The names for each column of the file.
+    :arg str path: The full path to the file.
+    :arg str delimiter:
+    :arg list list_columns:
+    :arg str list_separator:
 
     Returns the header, the row length histogram, and the paths of the files
     storing each column.
@@ -204,13 +236,15 @@ def _split_file(path, delimiter=None, list_columns=None, list_separator=None,
     #
     assert delimiter
     assert list_separator
-    with open(path, 'rb' if six.PY2 else 'r') as fin:
+
+    mode = 'rb' if six.PY2 else 'r'
+    with gzip.GzipFile(path, mode=mode) as fin:
         reader = _open_csv(fin, delimiter)
-        return split.split(reader, list_columns=list_columns,
-                           list_separator=list_separator, header=header)
+        return split.split(header, reader, list_columns=list_columns,
+                           list_separator=list_separator)
 
 
-def _process_multi(args):
+def _process_multi(header, paths, args):
     """Process multiple files as multiple subprocesses.
 
     The multiple processes come in handy for:
@@ -219,6 +253,7 @@ def _process_multi(args):
         2. Sorting each column
 
     Assumes the files contain the same columns.
+    Assumes the files are gzipped.
 
     Returns a header, the row length histogram, and a dictionary summary of the
     results.
@@ -230,20 +265,19 @@ def _process_multi(args):
     # This gives us a single set of M columns.
     #
     my_split = functools.partial(
-        _split_file, delimiter=args.delimiter, list_columns=args.list_fields,
-        list_separator=args.list_separator, header=args.header
+        _split_file, header, delimiter=args.delimiter,
+        list_columns=args.list_fields, list_separator=args.list_separator
     )
     pool = multiprocessing.Pool(processes=args.subprocesses)
 
     #
     # each result consists of header, histogram and paths
     #
-    results = pool.map(my_split, args.files)
-    headers, histograms, paths = zip(*results)
+    results = pool.map(my_split, paths)
+    histograms, paths = zip(*results)
 
-    _check_headers(headers)
     agg_histogram = _aggregate_histograms(histograms)
-    agg_paths = _aggregate_paths(paths)
+    agg_paths = _concatenate_tables(paths)
 
     #
     # We're already running sort_and_summarize in multiple subprocesses, so
@@ -258,13 +292,7 @@ def _process_multi(args):
     for path in agg_paths:
         os.unlink(path)
 
-    return headers[0], agg_histogram, results
-
-
-def _check_headers(headers):
-    for h in headers:
-        if h != headers[0]:
-            raise ValueError('the files contain different headers')
+    return agg_histogram, results
 
 
 def _aggregate_histograms(histograms):
@@ -283,7 +311,25 @@ def _aggregate_histograms(histograms):
     return aggregated
 
 
-def _aggregate_paths(tables):
+def _concatenate(paths):
+    """Concatenate the specified files together into a single file.
+
+    Deletes the files once the concatenation is complete.
+
+    Returns the new file path."""
+    handle, path = tempfile.mkstemp()
+
+    with os.fdopen(handle, 'wb') as fout:
+        command = ['cat'] + list(paths)
+        subprocess.check_call(command, stdout=fout)
+
+    for p in paths:
+        os.unlink(p)
+
+    return path
+
+
+def _concatenate_tables(tables, concatenate=_concatenate):
     """Concatenate the tables together to form one big table.
 
     Each table is a list of columns, where a column is stored in a separate
@@ -309,24 +355,6 @@ def _aggregate_paths(tables):
         concat_paths.append(_concatenate([tbl[column_number] for tbl in tables]))
 
     return concat_paths
-
-
-def _concatenate(paths):
-    """Concatenate the specified files together into a single file.
-
-    Deletes the files once the concatenation is complete.
-
-    Returns the new file path."""
-    handle, path = tempfile.mkstemp()
-
-    with os.fdopen(handle, 'wb') as fout:
-        command = ['cat'] + list(paths)
-        subprocess.check_call(command, stdout=fout)
-
-    for p in paths:
-        os.unlink(p)
-
-    return path
 
 
 def _open_csv(stream, delimiter):
