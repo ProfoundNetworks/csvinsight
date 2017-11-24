@@ -123,7 +123,9 @@ def main(stdout=sys.stdout):
             _override_config(fin, args)
 
     if _is_tiny(args.path):
-        header, histogram, results = _run_in_memory(args.path, args)
+        with open(args.path) as fin:
+            reader = _open_csv(fin, args.delimiter)
+            header, histogram, results = _run_in_memory(reader, args)
     else:
         header = _read_header(args.path, args.delimiter)
         part_paths = _split_large_file(args.path)
