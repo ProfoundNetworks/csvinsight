@@ -192,7 +192,7 @@ def split_in_memory(reader, list_columns=[], list_separator=LIST_SEPARATOR):
     try:
         header = next(reader)
     except StopIteration:
-        raise ValueError('Header may not be None')
+        raise ValueError('Reader may not be empty')
     histogram = collections.Counter()
     columns = [[] for _ in header]
     for i, row in enumerate(reader, 1):
