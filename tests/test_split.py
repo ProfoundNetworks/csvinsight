@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import collections
 import io
 
+import pytest
 import six
 import six.moves.queue as Queue
 
@@ -57,6 +58,11 @@ def test_run_in_memory():
     assert header == (b'foo', b'bar', b'baz')
     assert histogram == collections.Counter([3, 3, 2])
     assert columns == [[b'1', b'0'], [b'2', b'a', b'b'], [b'3', b'']]
+
+
+def test_read_empty_file():
+    with pytest.raises(ValueError):
+        csvinsight.split.split_in_memory(iter([]))
 
 
 def test_populate_queues():
