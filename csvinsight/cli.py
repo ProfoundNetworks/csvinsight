@@ -10,6 +10,7 @@ from __future__ import unicode_literals
 
 import argparse
 import csv
+import codecs
 import collections
 import distutils.spawn
 import functools
@@ -293,7 +294,8 @@ def _get_exe(*preference):
             return path
 
 
-def _split_file(header, path, dialect=None, list_columns=None, list_separator=None):
+def _split_file(header, path, dialect=None, list_columns=None, list_separator=None,
+                encoding='utf-8'):
     """Split a CSV file into columns, one column per file.
 
     :arg str header: The names for each column of the file.
@@ -315,8 +317,13 @@ def _split_file(header, path, dialect=None, list_columns=None, list_separator=No
     assert dialect
     assert list_separator
 
-    mode = 'rb' if six.PY2 else 'r'
-    with gzip.GzipFile(path, mode=mode) as fin:
+    with gzip.GzipFile(path, mode='rb') as fin:
+        if six.PY3:
+            #
+            # GzipFile docs state that it supports outputting text, but this
+            # doesn't seem so in practice, so we take care of it ourselves.
+            #
+            fin = codecs.getreader('utf-8')(fin)
         reader = csv.reader(fin, dialect=dialect)
         return split.split(header, reader, list_columns=list_columns,
                            list_separator=list_separator)
