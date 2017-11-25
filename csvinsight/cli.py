@@ -205,7 +205,7 @@ For the list of available dialect parameters, see:
     else:
         header = _read_header(args.path, csv_dialect)
         part_paths = _split_large_file(args.path)
-        histogram, results = _process_multi(header, part_paths, args)
+        histogram, results = _process_multi(header, part_paths, csv_dialect, args)
         for part in part_paths:
             os.unlink(part)
 
@@ -293,13 +293,12 @@ def _get_exe(*preference):
             return path
 
 
-def _split_file(header, dialect, path, delimiter=None, list_columns=None, list_separator=None):
+def _split_file(header, path, dialect=None, list_columns=None, list_separator=None):
     """Split a CSV file into columns, one column per file.
 
     :arg str header: The names for each column of the file.
-    :arg Dialect dialect: The CSV dialect to use when parsing.
     :arg str path: The full path to the file.
-    :arg str delimiter:
+    :arg Dialect dialect: The CSV dialect to use when parsing.
     :arg list list_columns:
     :arg str list_separator:
 
@@ -313,7 +312,7 @@ def _split_file(header, dialect, path, delimiter=None, list_columns=None, list_s
     # 2. We cannot pickle a csv.Reader
     # 3. split.split expects a csv.Reader
     #
-    assert delimiter
+    assert dialect
     assert list_separator
 
     mode = 'rb' if six.PY2 else 'r'
