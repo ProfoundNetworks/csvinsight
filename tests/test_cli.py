@@ -36,4 +36,3 @@ def test_parse_dialect_delimiter():
     assert dialect.doublequote == '"'
     assert dialect.skipinitialspace is False
     assert dialect.quoting == csv.QUOTE_ALL
-    assert dialect._valid is True
