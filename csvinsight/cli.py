@@ -277,11 +277,11 @@ def _split_large_file(path, lines_per_part=100000):
     else:
         chain = cat_command | tail_command | split_command
 
-    _LOGGER.info('chain: %s', chain)
+    _LOGGER.debug('chain: %s', chain)
     chain()
 
     full_paths_to_parts = [P.join(prefix, f) for f in os.listdir(prefix)]
-    _LOGGER.info('full_paths_to_parts: %r', full_paths_to_parts)
+    _LOGGER.debug('full_paths_to_parts: %r', full_paths_to_parts)
     return full_paths_to_parts
 
 
