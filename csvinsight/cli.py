@@ -96,23 +96,97 @@ def _run_in_memory(reader, args):
     return header, histogram, column_summaries
 
 
+_CSV_DIALECT_PARAMS = {
+    'delimiter': b'|' if six.PY2 else '|',
+    'quotechar': b'\'' if six.PY2 else '\'',
+    'escapechar': b'\\' if six.PY2 else '\\',
+    'doublequote': b'"' if six.PY2 else '"',
+    'skipinitialspace': 'True',
+    'lineterminator': b'\n' if six.PY2 else '\n',
+    'quoting': 'QUOTE_NONE'
+}
+
+
+class Dialect(csv.Dialect):
+    def __init__(self, **kwargs):
+        for param, defaultvalue in _CSV_DIALECT_PARAMS.items():
+            setattr(self, param, kwargs.get(param, defaultvalue))
+
+        self.skipinitialspace = self.skipinitialspace.lower() in ('true', 't', '1')
+
+        if not self.quoting.startswith('QUOTE_'):
+            raise ValueError('unsupported quoting method: %r' % self.quoting)
+        try:
+            self.quoting = getattr(csv, self.quoting)
+        except AttributeError:
+            raise ValueError('unsupported quoting method: %r' % self.quoting)
+
+    def __repr__(self):
+        params = ['%s=%r' % (key, getattr(self, key)) for key in _CSV_DIALECT_PARAMS]
+        return 'Dialect(%s)' % ', '.join(params)
+
+
+def _parse_dialect(pairs_as_strings):
+    _LOGGER.debug('locals: %r', locals())
+    if six.PY2:
+        kwargs = dict(six.binary_type(pair).split(b'=', 1) for pair in pairs_as_strings)
+    else:
+        kwargs = dict(six.text_type(pair).split(u'=', 1) for pair in pairs_as_strings)
+    dialect = Dialect(**kwargs)
+    # dialect._validate()
+    return dialect
+
+
 def _override_config(fin, args):
     config = yaml.load(fin)
-    args.delimiter = config.get('delimiter', args.delimiter)
     args.list_separator = config.get('list_separator', args.list_separator)
     args.list_fields = config.get('list_fields', args.list_fields)
 
+    #
+    # By inserting at the start of the list, we allow command-line arguments
+    # to override the configuration file.
+    #
+    for key in _CSV_DIALECT_PARAMS:
+        if key in config:
+            args.dialect.insert(0, '%s=%s' % (key, config[key]))
+
 
 def main(stdout=sys.stdout):
-    parser = argparse.ArgumentParser()
-    parser.add_argument('path', default=None)
-    parser.add_argument('--loglevel', default=logging.INFO)
-    parser.add_argument('--tempdir', default=tempfile.gettempdir())
-    parser.add_argument('--subprocesses', type=int, default=multiprocessing.cpu_count())
-    parser.add_argument('--config', default=None)
-    parser.add_argument('--delimiter', default='|')
-    parser.add_argument('--list-separator', default=';')
-    parser.add_argument('--list-fields', nargs='*', default=[])
+    log_levels = ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
+    description = 'Read a CSV file and determine unique values for each column'
+    epilog = """\
+If possible, install pigz on your system.  It makes better use of multiple
+cores when compressing and decompressing.
+
+Writes temporary files to disk, so make sure --tempdir is set to something with
+plenty of space.
+
+CSV dialects are specified as space-separated key-value pairs, for example:
+
+    csvi file.csv --dialect delimiter=, quoting=QUOTE_ALL
+
+For the list of available dialect parameters, see:
+
+    https://docs.python.org/2/library/csv.html#dialects-and-formatting-parameters
+    """
+    parser = argparse.ArgumentParser(
+        description=description, formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=epilog
+    )
+    parser.add_argument('path', default=None, help='The path to the CSV file to open')
+    parser.add_argument('--loglevel', choices=log_levels, default=logging.INFO)
+    parser.add_argument('--tempdir', default=tempfile.gettempdir(), metavar='SUBDIR',
+                        help='The directory to which temporary files will be written')
+    parser.add_argument('--subprocesses', type=int, default=multiprocessing.cpu_count(),
+                        metavar='NUM_CORES', help='The number of subprocesses to use')
+    parser.add_argument('--config', default=None, metavar='PATH',
+                        help='The path to the configuration file.')
+    parser.add_argument('--dialect', nargs='+', default=[], metavar='KEY=VALUE',
+                        help='The CSV dialect to use when parsing the file')
+    parser.add_argument('--list-fields', nargs='*', default=[], metavar='FIELD_NAME',
+                        help='The names of fields that contain lists instead of atomic values')
+    parser.add_argument('--list-separator', default=';', metavar='CHARACTER',
+                        help='The separator used to split lists into atomic values')
     args = parser.parse_args()
 
     logging.basicConfig(level=args.loglevel)
@@ -122,12 +196,14 @@ def main(stdout=sys.stdout):
         with open(args.config) as fin:
             _override_config(fin, args)
 
+    csv_dialect = _parse_dialect(args.dialect)
+
     if _is_tiny(args.path):
         with open(args.path) as fin:
-            reader = _open_csv(fin, args.delimiter)
+            reader = csv.reader(fin, dialect=csv_dialect)
             header, histogram, results = _run_in_memory(reader, args)
     else:
-        header = _read_header(args.path, args.delimiter)
+        header = _read_header(args.path, csv_dialect)
         part_paths = _split_large_file(args.path)
         histogram, results = _process_multi(header, part_paths, args)
         for part in part_paths:
@@ -136,11 +212,11 @@ def main(stdout=sys.stdout):
     _print_report(header, histogram, results)
 
 
-def _read_header(path, delimiter):
+def _read_header(path, dialect):
     """Read the CSV header from the first line of the specified file.
 
     :arg str path: The file to read.
-    :arg str delimiter: The column delimiter.
+    :arg Dialect dialect: The CSV dialect to use when parsing.
     :returns: The header
     :rtype: list
     """
@@ -153,7 +229,7 @@ def _read_header(path, delimiter):
             return open(path, mode)
 
     with open_path() as fin:
-        reader = _open_csv(fin, delimiter)
+        reader = csv.reader(fin, dialect=dialect)
         return next(reader)
 
 
@@ -217,10 +293,11 @@ def _get_exe(*preference):
             return path
 
 
-def _split_file(header, path, delimiter=None, list_columns=None, list_separator=None):
+def _split_file(header, dialect, path, delimiter=None, list_columns=None, list_separator=None):
     """Split a CSV file into columns, one column per file.
 
     :arg str header: The names for each column of the file.
+    :arg Dialect dialect: The CSV dialect to use when parsing.
     :arg str path: The full path to the file.
     :arg str delimiter:
     :arg list list_columns:
@@ -241,12 +318,12 @@ def _split_file(header, path, delimiter=None, list_columns=None, list_separator=
 
     mode = 'rb' if six.PY2 else 'r'
     with gzip.GzipFile(path, mode=mode) as fin:
-        reader = _open_csv(fin, delimiter)
+        reader = csv.reader(fin, dialect=dialect)
         return split.split(header, reader, list_columns=list_columns,
                            list_separator=list_separator)
 
 
-def _process_multi(header, paths, args):
+def _process_multi(header, paths, dialect, args):
     """Process multiple files as multiple subprocesses.
 
     The multiple processes come in handy for:
@@ -267,7 +344,7 @@ def _process_multi(header, paths, args):
     # This gives us a single set of M columns.
     #
     my_split = functools.partial(
-        _split_file, header, delimiter=args.delimiter,
+        _split_file, header, dialect=dialect,
         list_columns=args.list_fields, list_separator=args.list_separator
     )
     pool = multiprocessing.Pool(processes=args.subprocesses)
@@ -359,10 +436,8 @@ def _concatenate_tables(tables, concatenate=_concatenate):
     return concat_paths
 
 
-def _open_csv(stream, delimiter):
-    if six.PY2:
-        delimiter = six.binary_type(delimiter)
-    return csv.reader(stream, delimiter=delimiter, quoting=csv.QUOTE_NONE, escapechar=None)
+def _open_csv(stream, dialect):
+    return csv.reader(stream, dialect=dialect)
 
 
 if __name__ == "__main__":

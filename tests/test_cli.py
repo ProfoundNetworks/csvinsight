@@ -1,10 +1,9 @@
 from __future__ import unicode_literals
 
-import io
+import csv
 import os.path as P
 
 import mock
-import six
 
 import csvinsight.cli
 
@@ -25,3 +24,16 @@ def test_run_in_memory():
     assert header == ('name', 'age', 'fave_color')
     assert dict(histogram) == {3: 2, 2: 1}
     assert len(column_summaries) == 3
+
+
+def test_parse_dialect_delimiter():
+    opts = ('delimiter=\t', 'quotechar=\'', 'escapechar=\\', 'doublequote="',
+            'skipinitialspace=False', 'lineterminator=\n', 'quoting=QUOTE_ALL')
+    dialect = csvinsight.cli._parse_dialect(opts)
+    assert dialect.delimiter == '\t'
+    assert dialect.quotechar == '\''
+    assert dialect.escapechar == '\\'
+    assert dialect.doublequote == '"'
+    assert dialect.skipinitialspace is False
+    assert dialect.quoting == csv.QUOTE_ALL
+    assert dialect._valid is True
