@@ -49,7 +49,7 @@ Given a CSV file::
 
 you can obtain a CsvInsight report with::
 
-    bash-3.2$ cat tests/sampledata.csv | csvi --list-fields fave_color
+    bash-3.2$ csvi tests/sampledata.csv --list-fields fave_color
     CSV Insight Report
     Total # Rows: 3
     Column counts:
