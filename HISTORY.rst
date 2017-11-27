@@ -5,6 +5,9 @@ History
 Unreleased
 ----------
 
+0.2.1 (2017-11-27)
+------------------
+
 * Fix bug: opening gzipped files with Py3 now works
 
 0.2.0 (2017-11-25)
