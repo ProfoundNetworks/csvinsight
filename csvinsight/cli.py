@@ -200,11 +200,13 @@ For the list of available dialect parameters, see:
     csv_dialect = _parse_dialect(args.dialect)
 
     if _is_tiny(args.path):
-        with open(args.path) as fin:
+        with _open_for_reading(args.path) as fin:
             reader = csv.reader(fin, dialect=csv_dialect)
             header, histogram, results = _run_in_memory(reader, args)
     else:
-        header = _read_header(args.path, csv_dialect)
+        with _open_for_reading(args.path) as fin:
+            reader = csv.reader(fin, dialect=csv_dialect)
+            header = next(reader)
         part_paths = _split_large_file(args.path)
         histogram, results = _process_multi(header, part_paths, csv_dialect, args)
         for part in part_paths:
@@ -213,25 +215,30 @@ For the list of available dialect parameters, see:
     _print_report(header, histogram, results)
 
 
-def _read_header(path, dialect):
-    """Read the CSV header from the first line of the specified file.
+def _open_for_reading(path, encoding='utf-8'):
+    """Opens a file for reading.
 
-    :arg str path: The file to read.
-    :arg Dialect dialect: The CSV dialect to use when parsing.
-    :returns: The header
-    :rtype: list
+    Under Python 2, this means reading in binary mode, because that's what the
+    Py2 CSV module expects.  Under Py3, this means reading in text mode.
+
+    Transparently handles gzipped files.
+
+    :param str path: The path to open.
+    :param str encoding: The encoding to use when reading in text mode.
+    :returns: A file object
+    :rtype: fileobj
     """
-    mode = 'rb' if six.PY2 else 'r'
-
-    def open_path():
-        if _is_gzipped(path):
-            return gzip.GzipFile(path, mode=mode)
-        else:
-            return open(path, mode)
-
-    with open_path() as fin:
-        reader = csv.reader(fin, dialect=dialect)
-        return next(reader)
+    if _is_gzipped(path):
+        fin = gzip.GzipFile(path, mode='rb')
+        if six.PY3:
+            #
+            # GzipFile docs state that it supports outputting text, but this
+            # doesn't seem so in practice, so we take care of it ourselves.
+            #
+            fin = codecs.getreader(encoding)(fin)
+        return fin
+    else:
+        return open(path, 'r' if six.PY3 else 'rb')
 
 
 def _is_tiny(path):
@@ -317,13 +324,7 @@ def _split_file(header, path, dialect=None, list_columns=None, list_separator=No
     assert dialect
     assert list_separator
 
-    with gzip.GzipFile(path, mode='rb') as fin:
-        if six.PY3:
-            #
-            # GzipFile docs state that it supports outputting text, but this
-            # doesn't seem so in practice, so we take care of it ourselves.
-            #
-            fin = codecs.getreader('utf-8')(fin)
+    with _open_for_reading(path) as fin:
         reader = csv.reader(fin, dialect=dialect)
         return split.split(header, reader, list_columns=list_columns,
                            list_separator=list_separator)
