@@ -72,6 +72,8 @@ def _print_column_summary(summary, fout):
     num_samples = remainder = summary['num_values']
     print("        Counts      Percent  Field Value", file=fout)
     for count, value in summary['most_common']:
+        if six.PY2:
+            value = value.decode('utf-8')
         if value == '':
             value = 'NULL'
         print(

@@ -5,6 +5,8 @@ History
 Unreleased
 ----------
 
+* Fix bug: Unicode characters no longer break CsvInsight on Py2
+
 0.2.1 (2017-11-27)
 ------------------
 
