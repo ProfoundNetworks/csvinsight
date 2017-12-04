@@ -4,4 +4,4 @@
 
 __author__ = """Michael Penkov"""
 __email__ = 'mpenkov@profound.net'
-__version__ = '0.2.1'
+__version__ = '0.2.2'

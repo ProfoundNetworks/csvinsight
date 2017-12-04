@@ -30,7 +30,7 @@ test_requirements = [
 
 setup(
     name='csvinsight',
-    version='0.2.1',
+    version='0.2.2',
     description="Fast & simple summary for large CSV files",
     long_description=readme + '\n\n' + history,
     author="Michael Penkov",
