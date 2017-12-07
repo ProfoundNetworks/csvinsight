@@ -47,17 +47,17 @@ def test_make_batches():
 
 def test_run_in_memory():
     reader = [
-        (b'foo', b'bar', b'baz'),
-        (b'1', b'2', b'3'),
-        (b'0', b'a;b', b''),
-        (b'', b''),
+        ('foo', 'bar', 'baz'),
+        ('1', '2', '3'),
+        ('0', 'a;b', ''),
+        ('', ''),
     ]
     header, histogram, columns = csvinsight.split.split_in_memory(
         iter(reader), list_columns=('bar',)
     )
-    assert header == (b'foo', b'bar', b'baz')
+    assert header == ('foo', 'bar', 'baz')
     assert histogram == collections.Counter([3, 3, 2])
-    assert columns == [[b'1', b'0'], [b'2', b'a', b'b'], [b'3', b'']]
+    assert columns == [['1', '0'], ['2', 'a', 'b'], ['3', '']]
 
 
 def test_read_empty_file():
