@@ -2,6 +2,11 @@
 History
 =======
 
+Unreleased
+----------
+
+* Fix bug: Unicode column names now work under Py2
+
 0.2.2 (2017-12-04)
 ------------------
 

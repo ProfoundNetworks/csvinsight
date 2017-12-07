@@ -1,6 +1,8 @@
+# -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
 import csv
+import io
 import os.path as P
 
 import mock
@@ -36,3 +38,19 @@ def test_parse_dialect_delimiter():
     assert dialect.doublequote == '"'
     assert dialect.skipinitialspace is False
     assert dialect.quoting == csv.QUOTE_ALL
+
+
+def test_print_column_summary():
+    summary = dict(number=0, name='name', num_values=1, num_uniques=1,
+                   num_fills=1, fill_rate=1, min_len=1, max_len=1, avg_len=1)
+    summary['most_common'] = [(1, 'проверка')]
+    fout = io.StringIO()
+    csvinsight.cli._print_column_summary(summary, fout)
+    expected = """\
+0. name -> Uniques: 1 ; Fills: 1 ; Fill Rate: 1.0%
+    Field Length:  min 1, max 1, avg 1.00
+        Counts      Percent  Field Value
+        1           100.00 %  проверка
+
+"""
+    assert fout.getvalue() == expected

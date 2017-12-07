@@ -72,8 +72,6 @@ def _print_column_summary(summary, fout):
     num_samples = remainder = summary['num_values']
     print("        Counts      Percent  Field Value", file=fout)
     for count, value in summary['most_common']:
-        if six.PY2:
-            value = value.decode('utf-8')
         if value == '':
             value = 'NULL'
         print(
@@ -214,7 +212,23 @@ For the list of available dialect parameters, see:
         for part in part_paths:
             os.unlink(part)
 
-    _print_report(header, histogram, results)
+    #
+    # Reconcile differences between Py2 and Py3 here.
+    # _print_report expects strings and writes strings.
+    # Under Py2, everything until now outputs bytes, so we need to decode.
+    #
+    if six.PY2:
+        header = [h.decode('utf-8') for h in header]
+        for summary in results:
+            summary['most_common'] = [
+                (count, value.decode('utf-8'))
+                for (count, value) in summary['most_common']
+            ]
+        fout = codecs.getwriter('utf-8')(sys.stdout)
+    else:
+        fout = sys.stdout
+
+    _print_report(header, histogram, results, fout=fout)
 
 
 def _open_for_reading(path, encoding='utf-8'):
