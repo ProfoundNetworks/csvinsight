@@ -459,9 +459,5 @@ def _concatenate_tables(tables, concatenate=_concatenate):
     return concat_paths
 
 
-def _open_csv(stream, dialect):
-    return csv.reader(stream, dialect=dialect)
-
-
 if __name__ == "__main__":
     main()
