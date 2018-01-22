@@ -83,6 +83,33 @@ you can obtain a CsvInsight report with::
             1           25.00 %  blue
             1           25.00 %  NULL
 
+Since CSV comes in different flavors, you may need to tweak the underlying CSV parser's parameters to read your file successfully.
+CSVInsight handles this via CSV dialects.
+For example, to read a comma-separated file, you would use the following command::
+
+    bash-3.2$ csvi your/file.csv --dialect delimiter=,
+
+You may combine as many dialect parameters as needed::
+
+    bash-3.2$ csvi your/file.csv --dialect delimiter=, quoting=QUOTE_NONE
+
+For a full list of dialect parameters, see the documentation for Python's `csv module <https://docs.python.org/3.6/library/csv.html#dialects-and-formatting-parameters>`_.
+Constant values like QUOTE_NONE are resolved automagically.
+
+Once you've discovered the winning parameter combination for your file, save it to a YAML file::
+
+    list_fields:
+      - fave_color
+      - another_field_name
+    list_separator: ;
+    dialect:
+      - "delimiter=|"
+      - "quoting=QUOTE_NONE"
+
+You can then invoke CSVI as follows::
+
+    bash-3.2$ csvi your/file.csv --config your/config.yaml
+
 Credits
 ---------
 
@@ -90,4 +117,3 @@ This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypack
 
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
 .. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
-
