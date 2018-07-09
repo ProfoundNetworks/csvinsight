@@ -16,6 +16,7 @@ else:
     NEWLINE = u'\n'
 
 MOST_COMMON = 20
+"""The default number of most common items to show in the summary."""
 
 
 def run_length_encode(iterator):
@@ -50,14 +51,14 @@ class TopN(object):
         return [heapq.heappop(heapcopy) for _ in range(heapsize)]
 
 
-def summarize_sorted(iterator):
+def summarize_sorted(iterator, most_common=MOST_COMMON):
     num_values = 0
     num_uniques = 0
     num_empty = 0
     max_len = 0
     min_len = sys.maxsize
     sum_len = 0
-    topn = TopN()
+    topn = TopN(limit=most_common)
 
     for run_value, run_length in run_length_encode(iterator):
         if len(run_value) == 0:
@@ -90,7 +91,7 @@ def _get_exe(*preference):
 
 
 def sort_and_summarize(path, path_is_gzipped=True, compress_temporary=True, buffer_size='2G',
-                       num_subprocesses=None):
+                       num_subprocesses=None, most_common=MOST_COMMON):
     if num_subprocesses is None:
         num_subprocesses = multiprocessing.cpu_count()
     #
@@ -109,5 +110,6 @@ def sort_and_summarize(path, path_is_gzipped=True, compress_temporary=True, buff
         sort_cmd += ' --compress-program=%s' % gzip_exe
     template.append(sort_cmd, '--')
     with template.open(path, 'r') as fin:
-        result = summarize_sorted(line.rstrip(NEWLINE) for line in fin)
+        lines = (line.rstrip(NEWLINE) for line in fin)
+        result = summarize_sorted(lines, most_common=most_common)
     return result

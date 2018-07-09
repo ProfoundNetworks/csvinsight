@@ -93,7 +93,10 @@ def _run_in_memory(reader, args):
     header, histogram, columns = split.split_in_memory(
         reader, list_columns=args.list_fields, list_separator=args.list_separator
     )
-    column_summaries = [summarize.summarize_sorted(iter(sorted(col))) for col in columns]
+    column_summaries = [
+        summarize.summarize_sorted(iter(sorted(col)), most_common=args.most_common)
+        for col in columns
+    ]
     return header, histogram, column_summaries
 
 
@@ -188,6 +191,10 @@ For the list of available dialect parameters, see:
                         help='The names of fields that contain lists instead of atomic values')
     parser.add_argument('--list-separator', default=';', metavar='CHARACTER',
                         help='The separator used to split lists into atomic values')
+    parser.add_argument(
+        '--most-common', default=summarize.MOST_COMMON,
+        help='The number of most common values to show for each column'
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=args.loglevel)
@@ -387,7 +394,8 @@ def _process_multi(header, paths, dialect, args):
     #
     my_sort = functools.partial(
         summarize.sort_and_summarize, path_is_gzipped=True,
-        compress_temporary=True, num_subprocesses=1
+        compress_temporary=True, num_subprocesses=1,
+        most_common=args.most_common,
     )
     results = pool.map(my_sort, agg_paths)
 
