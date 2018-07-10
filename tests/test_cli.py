@@ -21,7 +21,7 @@ def test_run_in_memory():
                    ('Misha', '33', 'red;yellow'),
                    ('Valya', '31', 'blue'),
                    ('Lyosha', 0)])
-    args = mock.Mock(list_fields=['fave_color'], list_separator=';')
+    args = mock.Mock(list_fields=['fave_color'], list_separator=';', most_common=20)
     header, histogram, column_summaries = csvinsight.cli._run_in_memory(reader, args)
     assert header == ('name', 'age', 'fave_color')
     assert dict(histogram) == {3: 2, 2: 1}
