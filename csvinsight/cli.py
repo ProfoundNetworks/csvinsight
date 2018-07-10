@@ -15,6 +15,7 @@ import collections
 import distutils.spawn
 import functools
 import gzip
+import json
 import logging
 import multiprocessing
 import os
@@ -207,6 +208,10 @@ For the list of available dialect parameters, see:
         '--lines-per-part', default=_LINES_PER_PART,
         help='The number of lines in each part when splitting large files'
     )
+    parser.add_argument(
+        '--json',
+        help='Write a JSON version of the report to this file'
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=args.loglevel)
@@ -257,6 +262,19 @@ For the list of available dialect parameters, see:
         histogram, results = _process_multi(header, part_paths, csv_dialect, args)
         for part in part_paths:
             os.unlink(part)
+
+    if args.json:
+        report_as_json = {
+            'path': args.path,
+            'histogram': histogram,
+            'header': header,
+            'results': {
+                name: results
+                for (name, results) in zip(header, results)
+            },
+        }
+        with open(args.json, 'w') as fout:
+            json.dump(report_as_json, fout)
 
     #
     # Reconcile differences between Py2 and Py3 here.
