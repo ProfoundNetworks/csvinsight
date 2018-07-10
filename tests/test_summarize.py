@@ -39,3 +39,9 @@ def test_top_n():
 
     topn.push(1, 'oops')
     assert topn.to_list() == [(2, 'bar'), (3, 'baz'), (4, 'boz')]
+
+
+def test_no_data():
+    empty = iter([])
+    with pytest.raises(ValueError):
+        list(csvinsight.summarize.summarize_sorted(empty))
