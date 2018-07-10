@@ -12,6 +12,7 @@ with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
 requirements = [
+    'jupyter',
     'plumbum',
     'pyyaml',
     'six',
@@ -19,13 +20,11 @@ requirements = [
 
 setup_requirements = [
     'pytest-runner',
-    # TODO(mpenkov): put setup requirements (distutils extensions, etc.) here
 ]
 
 test_requirements = [
     'mock',
     'pytest',
-    # TODO: put package test requirements here
 ]
 
 setup(

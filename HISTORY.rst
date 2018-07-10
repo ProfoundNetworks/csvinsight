@@ -11,6 +11,7 @@ Unreleased
 * Improve error message when handling empty CSV files
 * Fixed "Argument list too long" error (Issue #15)
 * Added --json parameter
+* Added --ipynb parameter to generate IPython notebook
 
 0.2.3 (2017-12-09)
 ------------------

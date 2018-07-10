@@ -32,6 +32,13 @@ from . import split
 from . import summarize
 
 _LOGGER = logging.getLogger(__name__)
+
+try:
+    from . import ipynb
+except ImportError:
+    _LOGGER.warning('ipynb support is disabled')
+
+
 _GZIP_MAGIC = b'\x1f\x8b'
 _MAX_ARGS = 100
 """The max number of arguments to pass to a single subprocess call."""
@@ -212,6 +219,10 @@ For the list of available dialect parameters, see:
         '--json',
         help='Write a JSON version of the report to this file'
     )
+    parser.add_argument(
+        '--ipynb',
+        help='Write a Python notebook version of the report to this file'
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=args.loglevel)
@@ -263,18 +274,23 @@ For the list of available dialect parameters, see:
         for part in part_paths:
             os.unlink(part)
 
+    report_as_json = {
+        'path': args.path,
+        'histogram': histogram,
+        'header': header,
+        'results': {
+            name: results
+            for (name, results) in zip(header, results)
+        },
+    }
+
     if args.json:
-        report_as_json = {
-            'path': args.path,
-            'histogram': histogram,
-            'header': header,
-            'results': {
-                name: results
-                for (name, results) in zip(header, results)
-            },
-        }
         with open(args.json, 'w') as fout:
             json.dump(report_as_json, fout)
+
+    if args.ipynb:
+        with open(args.ipynb, 'w') as fout:
+            fout.write(ipynb.generate(report_as_json))
 
     #
     # Reconcile differences between Py2 and Py3 here.
