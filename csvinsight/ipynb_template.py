@@ -11,6 +11,26 @@ import matplotlib.pyplot as plt
 report = None
 
 # <codecell>
+# This is a self-contained IPython notebook created for your CsvInsight report.
+# The CsvInsight report is stored in the "report" variable.
+# You can use it access any part of the result.
+# Here's the path to the CSV file used to generate the report:
+report['path']
+
+# <codecell>
+# The header from that CSV file:
+report['header'][:10]
+
+# <codecell>
+# The histogram of column numbers per each row
+report['histogram']
+
+# <codecell>
+# Each column in the header has its own results:
+report['results']['web_server_type']
+
+# <codecell>
+# You may use the above data to visualize the CsvInsight report.
 
 def plot_pie(field, skip_empty=False, figsize=(6, 6)):
     try:
