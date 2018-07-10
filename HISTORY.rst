@@ -9,6 +9,7 @@ Unreleased
 * Added --no-tiny parameter
 * Refactored temporary file naming
 * Improve error message when handling empty CSV files
+* Fixed "Argument list too long" error (Issue #15)
 
 0.2.3 (2017-12-09)
 ------------------

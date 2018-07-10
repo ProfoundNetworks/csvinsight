@@ -69,7 +69,7 @@ class WriterThread(threading.Thread):
         self._fout.write(('\n'.join(lines) + '\n').encode(TEXT_ENCODING))
 
 
-def _make_batches(iterable, batch_size=DEFAULT_BATCH_SIZE):
+def make_batches(iterable, batch_size=DEFAULT_BATCH_SIZE):
     batch = []
     for row in iterable:
         if len(batch) == batch_size:
@@ -109,7 +109,7 @@ def _populate_queues(header, reader, queues, list_columns=[],
     # We put batches on the queue, not the actual values themselves.
     # This reduces the overhead (number of calls to Queue.put and .get).
     #
-    for batch in _make_batches(reader, batch_size=batch_size):
+    for batch in make_batches(reader, batch_size=batch_size):
         histogram.update(len(row) for row in batch)
         columns = [list() for _ in header]
         for row in batch:

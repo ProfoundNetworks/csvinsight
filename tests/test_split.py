@@ -42,9 +42,9 @@ def test_writer_thread():
 
 
 def test_make_batches():
-    assert list(csvinsight.split._make_batches([1, 2], 1)) == [[1], [2]]
-    assert list(csvinsight.split._make_batches([1, 2], 2)) == [[1, 2]]
-    assert list(csvinsight.split._make_batches([1, 2, 3], 2)) == [[1, 2], [3]]
+    assert list(csvinsight.split.make_batches([1, 2], 1)) == [[1], [2]]
+    assert list(csvinsight.split.make_batches([1, 2], 2)) == [[1, 2]]
+    assert list(csvinsight.split.make_batches([1, 2, 3], 2)) == [[1, 2], [3]]
 
 
 def test_run_in_memory():

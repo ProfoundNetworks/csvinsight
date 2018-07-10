@@ -32,6 +32,10 @@ from . import summarize
 
 _LOGGER = logging.getLogger(__name__)
 _GZIP_MAGIC = b'\x1f\x8b'
+_MAX_ARGS = 100
+"""The max number of arguments to pass to a single subprocess call."""
+
+_LINES_PER_PART = 100000
 
 
 def _print_report(header, histogram, results, fout=sys.stdout):
@@ -199,6 +203,10 @@ For the list of available dialect parameters, see:
         '--no-tiny', action='store_true',
         help='Skip the in-memory optimization for tiny CSV files'
     )
+    parser.add_argument(
+        '--lines-per-part', default=_LINES_PER_PART,
+        help='The number of lines in each part when splitting large files'
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=args.loglevel)
@@ -245,7 +253,7 @@ For the list of available dialect parameters, see:
     else:
         with _open_for_reading(args.path) as fin:
             header = next(csv.reader(fin, dialect=csv_dialect))
-        part_paths = _split_large_file(args.path)
+        part_paths = _split_large_file(args.path, lines_per_part=args.lines_per_part)
         histogram, results = _process_multi(header, part_paths, csv_dialect, args)
         for part in part_paths:
             os.unlink(part)
@@ -307,7 +315,7 @@ def _is_gzipped(path):
         return fin.read(len(_GZIP_MAGIC)) == _GZIP_MAGIC
 
 
-def _split_large_file(path, lines_per_part=100000):
+def _split_large_file(path, lines_per_part=_LINES_PER_PART):
     """Split a large file into smaller files.
 
     Uses GNU command-line tools (e.g. gzip, gsplit) under the cover to
@@ -460,17 +468,26 @@ def _aggregate_histograms(histograms):
     return aggregated
 
 
-def _concatenate(paths):
+def _concatenate(paths, batch_size=_MAX_ARGS):
     """Concatenate the specified files together into a single file.
 
-    Deletes the files once the concatenation is complete.
+    It's possible that paths contains more than what we can pass in a
+    single subprocess call, so we split them into batches and append
+    each batch individually.
 
-    Returns the new file path."""
+    :param iterator paths: The paths to concatenate
+    :param int batch_size: The max number of files to pass to a single cat call
+    :returns: The new file path
+    :rtype: str
+    """
     handle, path = tempfile.mkstemp()
+    os.close(handle)
 
-    with os.fdopen(handle, 'wb') as fout:
-        command = ['cat'] + list(paths)
-        subprocess.check_call(command, stdout=fout)
+    for batch in split.make_batches(paths, batch_size=_MAX_ARGS):
+        with open(path, 'ab') as fout:
+            command = ['cat'] + batch
+            _LOGGER.debug('command: %r', command)
+            subprocess.check_call(command, stdout=fout)
 
     for p in paths:
         os.unlink(p)
