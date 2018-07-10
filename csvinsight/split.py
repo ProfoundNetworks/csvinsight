@@ -3,9 +3,9 @@ from __future__ import unicode_literals
 
 import collections
 import gzip
+import logging
 import os
-import random
-import tempfile
+import os.path as P
 import threading
 
 import six
@@ -18,30 +18,25 @@ LIST_SEPARATOR = ';'
 TEXT_ENCODING = 'utf-8'
 
 
-def _open_temp_file(mode, prefix='tmp'):
-    """Open a gzipped temporary file.  Returns the file object and path."""
-    handle, path = tempfile.mkstemp(prefix=prefix, suffix='.gz')
-    return gzip.GzipFile(fileobj=os.fdopen(handle, mode), mode=mode), path
+def _open_temp(subdir, column_id):
+    path = P.join(subdir, '%04d.gz' % column_id)
+    fout = gzip.GzipFile(path, mode='wb')
+    return fout, path
 
 
 class WriterThread(threading.Thread):
     """Reads column values from a queue and writes them to a temporary file.
 
-    Prefixes the temporary file name with 'csvi-{file_id}-{column_id}-' in case
-    you ever need to peek into the files by yourself.
-
-    :arg int file_id:
-    :arg int column_id:
+    :arg str subdir: The subdirectory where the output file should exist.
+    :arg int column_id: The ordinal number of the column being written.
     :arg Queue.Queue queue: The queue to read from
     :arg open_temp: A callback for opening a temporary file.
     """
-    def __init__(self, file_id, column_id, queue, open_temp=_open_temp_file):
+    def __init__(self, subdir, column_id, queue, open_temp=_open_temp):
         super(WriterThread, self).__init__()
-        self._file_id = file_id
         self._column_id = column_id
         self._queue = queue
-        prefix = 'csvi-%d-%d-' % (self._file_id, self._column_id)
-        self._fout, self._path = open_temp('wb', prefix=prefix)
+        self._fout, self._path = open_temp(subdir, column_id)
 
         #
         # This works around a Py2 vs Py3 sticking point.
@@ -132,15 +127,14 @@ def _populate_queues(header, reader, queues, list_columns=[],
     return histogram
 
 
-def split(header, reader, open_file=_open_temp_file,
-          list_columns=[], list_separator=LIST_SEPARATOR):
+def split(header, reader, list_columns=[], list_separator=LIST_SEPARATOR, path=None):
     """Split a CSV reader into columns, one column per temporary file.
 
     :arg list header: The column names to assume.
     :arg csv.Reader reader: The reader to split.
-    :arg open_file: A callback for opening temporary files.
     :arg list list_columns: Column names to treat as containing lists
     :arg str list_separator: The separator to use when splitting lists
+    :arg str path: The path to the file being split.  May not be None.
     :returns: histogram, values for each columns
     :rtype: tuple of (list, collections.Counter, list of lists)
 
@@ -152,12 +146,28 @@ def split(header, reader, open_file=_open_temp_file,
     """
     if header is None:
         raise ValueError('header may not be None')
+    if path is None:
+        raise ValueError('path may not be None')
     if six.PY2:
         list_columns = [six.binary_type(col) for col in list_columns]
         list_separator = six.binary_type(list_separator)
-    file_id = random.randint(0, 1000)
+
+    parts_dir, part_name = P.split(path)
+    assert '/parts' in parts_dir, 'expected %r to contain "/parts"' % parts_dir
+
+    columns_dir = parts_dir.replace('/parts', '/columns')
+    assert P.isdir(columns_dir), 'expected %r to exist by now' % columns_dir
+
+    part_columns_dir = P.join(columns_dir, part_name)
+
+    logging.debug('parts_dir: %r', parts_dir)
+    logging.debug('columns_dir: %r', columns_dir)
+    logging.debug('part_columns_dir: %r', part_columns_dir)
+
+    os.mkdir(part_columns_dir)
+
     queues = [Queue.Queue(MAX_QUEUE_SIZE) for _ in header]
-    threads = [WriterThread(file_id, i, queue, open_temp=_open_temp_file)
+    threads = [WriterThread(part_columns_dir, i, queue)
                for i, queue in enumerate(queues)]
     for thread in threads:
         thread.start()

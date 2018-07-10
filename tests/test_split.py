@@ -24,14 +24,16 @@ def test_writer_thread():
     buf = io.BytesIO()
     buf.close = lambda: None
 
-    def open_temp_file(mode, prefix='tmp'):
-        return buf, '/some/dummy/path'
+    def open_temp_file(subdir, column_id):
+        return buf, '/%s/%04d.gz' % (subdir, column_id)
 
     queue = Queue.Queue()
     for batch in mock_batch():
         queue.put(batch)
 
-    thread = csvinsight.split.WriterThread(0, 0, queue, open_temp_file)
+    thread = csvinsight.split.WriterThread(
+        '/tmp/subdir', 0, queue, open_temp=open_temp_file
+    )
     thread.start()
     thread.join()
 

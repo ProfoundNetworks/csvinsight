@@ -195,6 +195,10 @@ For the list of available dialect parameters, see:
         '--most-common', default=summarize.MOST_COMMON,
         help='The number of most common values to show for each column'
     )
+    parser.add_argument(
+        '--no-tiny', action='store_true',
+        help='Skip the in-memory optimization for tiny CSV files'
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=args.loglevel)
@@ -206,14 +210,41 @@ For the list of available dialect parameters, see:
 
     csv_dialect = _parse_dialect(args.dialect)
 
-    if _is_tiny(args.path):
+    #
+    # To process a large file, we do the following:
+    #
+    # 1. Split the larger file into multiple equal-sized smaller parts.
+    # 2. Split each smaller part into columns.
+    # 3. Process each column individually
+    #
+    # We do (1) because it enables us to do (2) using multiple processes.
+    #
+    # The above process means we need to use M * N temporary files, where:
+    #
+    # - M = number of parts (num_lines_in_file / part_size)
+    # - N = number of columns
+    #
+    # We organize the files as follows.
+    #
+    # (1) creates /TMPDIR/csvi-xxxx/parts/yy.gz where TMPDIR comes from
+    # the tempfile library, xxxx is a random number and yy is the number of
+    # the part.
+    #
+    # (2) creates /TMPDIR/csvi-XXXX/columns/yy/zz.gz, where zz is the column
+    # number, and all the other variables are the same as above.
+    #
+    # The above allows us to split the CSV file into columns quickly and
+    # without loading large parts of it into memory at once.  Of course,
+    # the above is a complete waste of time for files that easily fit into
+    # memory, so we shortcut the process in that case.
+    #
+    if _is_tiny(args.path) and not args.no_tiny:
         with _open_for_reading(args.path) as fin:
             reader = csv.reader(fin, dialect=csv_dialect)
             header, histogram, results = _run_in_memory(reader, args)
     else:
         with _open_for_reading(args.path) as fin:
-            reader = csv.reader(fin, dialect=csv_dialect)
-            header = next(reader)
+            header = next(csv.reader(fin, dialect=csv_dialect))
         part_paths = _split_large_file(args.path)
         histogram, results = _process_multi(header, part_paths, csv_dialect, args)
         for part in part_paths:
@@ -296,7 +327,15 @@ def _split_large_file(path, lines_per_part=100000):
     gzip_exe = _get_exe('pigz', 'gzip')
     gzip_command = plumbum.local[gzip_exe]['--decompress', '--stdout', path]
 
-    prefix = tempfile.mkdtemp(prefix='csvi-')
+    tmpdir = tempfile.mkdtemp(prefix='csvi-')
+    prefix = P.join(tmpdir, 'parts')
+    os.mkdir(prefix)
+
+    #
+    # We do this here because it's simpler.  Afterwards, multiple threads will
+    # require this directory to exist.
+    #
+    os.mkdir(P.join(tmpdir, 'columns'))
 
     split_exe = _get_exe('gsplit', 'split')
     split_flags = ['--filter', "%s > $FILE.gz" % gzip_exe,
@@ -350,7 +389,7 @@ def _split_file(header, path, dialect=None, list_columns=None, list_separator=No
     with _open_for_reading(path) as fin:
         reader = csv.reader(fin, dialect=dialect)
         return split.split(header, reader, list_columns=list_columns,
-                           list_separator=list_separator)
+                           list_separator=list_separator, path=path)
 
 
 def _process_multi(header, paths, dialect, args):

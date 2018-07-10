@@ -2,6 +2,13 @@
 History
 =======
 
+Unreleased
+----------
+
+* Added --most-common parameter
+* Added --no-tiny parameter
+* Refactored temporary file naming
+
 0.2.3 (2017-12-09)
 ------------------
 
