@@ -71,6 +71,9 @@ def summarize_sorted(iterator, most_common=MOST_COMMON):
         sum_len += val_len * run_length
         topn.push(run_length, run_value)
 
+    if num_values == 0:
+        raise ValueError('CSV file contains no data')
+
     return {
         'num_values': num_values,
         'num_fills': num_values - num_empty,

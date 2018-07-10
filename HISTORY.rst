@@ -5,9 +5,10 @@ History
 Unreleased
 ----------
 
-* Added --most-common parameter
+* Added --most-common parameter (resolved Issue #14)
 * Added --no-tiny parameter
 * Refactored temporary file naming
+* Improve error message when handling empty CSV files
 
 0.2.3 (2017-12-09)
 ------------------
