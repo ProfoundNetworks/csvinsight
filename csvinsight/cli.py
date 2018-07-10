@@ -196,7 +196,7 @@ For the list of available dialect parameters, see:
     parser.add_argument('--list-separator', default=';', metavar='CHARACTER',
                         help='The separator used to split lists into atomic values')
     parser.add_argument(
-        '--most-common', default=summarize.MOST_COMMON,
+        '--most-common', default=summarize.MOST_COMMON, type=int,
         help='The number of most common values to show for each column'
     )
     parser.add_argument(
