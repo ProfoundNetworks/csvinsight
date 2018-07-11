@@ -6,6 +6,7 @@
 import os.path as P
 
 import nbformat
+import subprocess
 
 
 def generate(report):
@@ -25,3 +26,18 @@ def generate(report):
     nbook = nbformat.v3.reads_py(template)
     nbook = nbformat.v4.upgrade(nbook)
     return nbformat.v4.writes(nbook) + "\n"
+
+
+def execute(path, save_html=False):
+    """Execute an IPython notebook in-place.
+
+    :param path str: The path to the notebook.
+    """
+    command = (
+        'jupyter', 'nbconvert', '--execute', path,
+        '--to', 'notebook', '--inplace'
+    )
+    subprocess.check_call(command)
+    if save_html:
+        command = ('jupyter', 'nbconvert', path, '--to', 'html')
+        subprocess.check_call(command)

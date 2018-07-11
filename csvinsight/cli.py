@@ -291,6 +291,7 @@ For the list of available dialect parameters, see:
     if args.ipynb:
         with open(args.ipynb, 'w') as fout:
             fout.write(ipynb.generate(report_as_json))
+        ipynb.execute(args.ipynb, save_html=True)
 
     #
     # Reconcile differences between Py2 and Py3 here.
