@@ -2,8 +2,8 @@
 History
 =======
 
-Unreleased
-----------
+0.3.0 (2018-07-11)
+------------------
 
 * Added --most-common parameter (resolved Issue #14)
 * Added --no-tiny parameter
