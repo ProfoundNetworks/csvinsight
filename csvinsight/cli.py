@@ -33,12 +33,6 @@ from . import summarize
 
 _LOGGER = logging.getLogger(__name__)
 
-try:
-    from . import ipynb
-except ImportError:
-    _LOGGER.warning('ipynb support is disabled')
-
-
 _GZIP_MAGIC = b'\x1f\x8b'
 _MAX_ARGS = 100
 """The max number of arguments to pass to a single subprocess call."""
@@ -167,6 +161,13 @@ def _override_config(fin, args):
             args.dialect.insert(0, '%s=%s' % (key, config[key]))
 
 
+def _generate_ipython_report(ipynb_path, report_as_json):
+    from . import ipynb
+    with open(ipynb_path, 'w') as fout:
+        fout.write(ipynb.generate(report_as_json))
+    ipynb.execute(ipynb_path, save_html=True)
+
+
 def main(stdout=sys.stdout):
     log_levels = ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
     description = 'Read a CSV file and determine unique values for each column'
@@ -221,7 +222,8 @@ For the list of available dialect parameters, see:
     )
     parser.add_argument(
         '--ipynb',
-        help='Write a Python notebook version of the report to this file'
+        help='Write a Python notebook version of the report to this file. '
+             'Requires an optional Jupyter dependency.'
     )
     args = parser.parse_args()
 
@@ -231,6 +233,16 @@ For the list of available dialect parameters, see:
     if args.config:
         with open(args.config) as fin:
             _override_config(fin, args)
+
+    if args.ipynb:
+        try:
+            from . import ipynb  # noqa
+        except ImportError:
+            _LOGGER.critical(
+                "Could not import jupyter library. Please install it via pip by calling "
+                "pip install jupyter or pip install csvinsight[notebook]"
+            )
+            sys.exit(1)
 
     csv_dialect = _parse_dialect(args.dialect)
 
@@ -289,10 +301,7 @@ For the list of available dialect parameters, see:
             json.dump(report_as_json, fout)
 
     if args.ipynb:
-        with open(args.ipynb, 'w') as fout:
-            fout.write(ipynb.generate(report_as_json))
-        ipynb.execute(args.ipynb, save_html=True)
-
+        _generate_ipython_report(args.ipynb, report_as_json)
     #
     # Reconcile differences between Py2 and Py3 here.
     # _print_report expects strings and writes strings.

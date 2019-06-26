@@ -14,7 +14,13 @@ To install csvinsight, run this command in your terminal:
 
     $ pip install csvinsight
 
-This is the preferred method to install csvinsight, as it will always install the most recent stable release. 
+To install csvinsight with Jupyter notebook support, run the following command:
+
+.. code-block:: console
+
+    $ pip install csvinsight[notebook]
+
+This is the preferred method to install csvinsight, as it will always install the most recent stable release.
 
 If you don't have `pip`_ installed, this `Python installation guide`_ can guide
 you through the process.
