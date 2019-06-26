@@ -5,6 +5,9 @@ History
 Unreleased
 ----------
 
+0.3.1 (2018-06-26)
+------------------
+
 * Make Jupyter notebook an optional dependency
 
 0.3.0 (2018-07-11)
