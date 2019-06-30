@@ -169,6 +169,8 @@ def _generate_ipython_report(ipynb_path, report_as_json):
 
 
 def main(stdout=sys.stdout):
+    csv.field_size_limit(sys.maxsize)
+
     log_levels = ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
     description = 'Read a CSV file and determine unique values for each column'
     epilog = """\

@@ -5,7 +5,12 @@ History
 Unreleased
 ----------
 
-0.3.1 (2018-06-26)
+0.3.2 (2019-07-01)
+------------------
+
+* Set the field size limit to sys.maxsize
+
+0.3.1 (2019-06-26)
 ------------------
 
 * Make Jupyter notebook an optional dependency
