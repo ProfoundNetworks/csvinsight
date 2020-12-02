@@ -124,12 +124,20 @@ class Dialect(csv.Dialect):
 
         self.skipinitialspace = self.skipinitialspace.lower() in ('true', 't', '1')
 
-        if not self.quoting.startswith('QUOTE_'):
+        #
+        # There are two ways to specify the quoting parameter: either directly,
+        # as an integer (as it's defined in the csv submodule), or as a string
+        # literal, e.g. "QUOTE_NONE".
+        #
+        if self.quoting.isdigit():
+            self.quoting = int(self.quoting)
+        elif not self.quoting.startswith('QUOTE_'):
             raise ValueError('unsupported quoting method: %r' % self.quoting)
-        try:
-            self.quoting = getattr(csv, self.quoting)
-        except AttributeError:
-            raise ValueError('unsupported quoting method: %r' % self.quoting)
+        else:
+            try:
+                self.quoting = getattr(csv, self.quoting)
+            except AttributeError:
+                raise ValueError('unsupported quoting method: %r' % self.quoting)
 
     def __repr__(self):
         params = ['%s=%r' % (key, getattr(self, key)) for key in _CSV_DIALECT_PARAMS]

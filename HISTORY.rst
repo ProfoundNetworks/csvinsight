@@ -5,6 +5,11 @@ History
 Unreleased
 ----------
 
+0.3.3 (2020-12-02)
+------------------
+
+* Handle numeric quoting parameter, e.g. "--dialect quoting=3"
+
 0.3.2 (2019-07-01)
 ------------------
 

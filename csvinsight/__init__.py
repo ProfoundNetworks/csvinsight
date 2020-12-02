@@ -3,5 +3,5 @@
 """Top-level package for csvinsight."""
 
 __author__ = """Michael Penkov"""
-__email__ = 'mpenkov@profound.net'
-__version__ = '0.2.3'
+__email__ = 'm@penkov.dev'
+__version__ = '0.3.3'

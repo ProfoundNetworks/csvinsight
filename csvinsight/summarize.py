@@ -20,16 +20,23 @@ MOST_COMMON = 20
 
 
 def run_length_encode(iterator):
-    run_value, run_length = next(iterator), 1
-    for value in iterator:
-        if value < run_value:
-            raise ValueError('unsorted iterator')
-        elif value != run_value:
-            yield run_value, run_length
-            run_value, run_length = value, 1
-        else:
-            run_length += 1
-    yield run_value, run_length
+    try:
+        run_value, run_length = next(iterator), 1
+    except StopIteration:
+        #
+        # Empty iterator, nothing to do.
+        #
+        pass
+    else:
+        for value in iterator:
+            if value < run_value:
+                raise ValueError('unsorted iterator')
+            elif value != run_value:
+                yield run_value, run_length
+                run_value, run_length = value, 1
+            else:
+                run_length += 1
+        yield run_value, run_length
 
 
 class TopN(object):
