@@ -12,9 +12,8 @@ with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
 requirements = [
-    'plumbum',
-    'pyyaml',
-    'six',
+    'smart_open',
+    'zstandard',
 ]
 
 setup_requirements = [
@@ -26,10 +25,6 @@ test_requirements = [
     'pytest',
     'jupyter',
 ]
-
-extras_require = {
-    'notebook': ['jupyter', ],
-}
 
 setup(
     name='csvinsight',
@@ -55,13 +50,13 @@ setup(
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Natural Language :: English',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
     ],
     test_suite='tests',
     tests_require=test_requirements,
     setup_requires=setup_requirements,
-    extras_require=extras_require,
 )
