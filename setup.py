@@ -23,12 +23,7 @@ setup_requirements = [
 test_requirements = [
     'mock',
     'pytest',
-    'jupyter',
 ]
-
-extras_require = {
-    'notebook': ['jupyter', ],
-}
 
 setup(
     name='csvinsight',
@@ -62,5 +57,4 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     setup_requires=setup_requirements,
-    extras_require=extras_require,
 )

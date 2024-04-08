@@ -185,13 +185,6 @@ def _override_config(fin, args):
             args.dialect.insert(0, f'{key}={config[key]}')
 
 
-def _generate_ipython_report(ipynb_path, report_as_json):
-    from . import ipynb
-    with open(ipynb_path, 'w') as fout:
-        fout.write(ipynb.generate(report_as_json))
-    ipynb.execute(ipynb_path, save_html=True)
-
-
 def main(stdout=sys.stdout):
     csv.field_size_limit(sys.maxsize)
 
@@ -246,11 +239,6 @@ For the list of available dialect parameters, see:
         '--json',
         help='Write a JSON version of the report to this file'
     )
-    parser.add_argument(
-        '--ipynb',
-        help='Write a Python notebook version of the report to this file. '
-             'Requires an optional Jupyter dependency.'
-    )
     args = parser.parse_args()
 
     logging.basicConfig(level=args.loglevel)
@@ -259,16 +247,6 @@ For the list of available dialect parameters, see:
     if args.config:
         with open(args.config) as fin:
             _override_config(fin, args)
-
-    if args.ipynb:
-        try:
-            from . import ipynb  # noqa
-        except ImportError:
-            _LOGGER.critical(
-                "Could not import jupyter library. Please install it via pip by calling "
-                "pip install jupyter or pip install csvinsight[notebook]"
-            )
-            sys.exit(1)
 
     csv_dialect = _parse_dialect(args.dialect)
 
@@ -326,17 +304,11 @@ For the list of available dialect parameters, see:
         with open(args.json, 'w') as fout:
             json.dump(report_as_json, fout)
 
-    if args.ipynb:
-        _generate_ipython_report(args.ipynb, report_as_json)
-
     _print_report(header, histogram, results, fout=sys.stdout)
 
 
 def _open_for_reading(path, encoding='utf-8'):
     """Opens a file for reading.
-
-    Under Python 2, this means reading in binary mode, because that's what the
-    Py2 CSV module expects.  Under Py3, this means reading in text mode.
 
     Transparently handles gzipped files.
 
