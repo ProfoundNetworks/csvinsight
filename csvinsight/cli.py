@@ -165,8 +165,10 @@ def _override_config(fin, args):
     # to override the configuration file.
     #
     for key in _CSV_DIALECT_PARAMS:
-        if key in config:
-            args.dialect.insert(0, '%s=%s' % (key, config[key]))
+        if key in config and config[key] is None:
+            args.dialect.insert(0, f'{key}=')
+        elif key in config:
+            args.dialect.insert(0, f'{key}={config[key]}')
 
 
 def _generate_ipython_report(ipynb_path, report_as_json):

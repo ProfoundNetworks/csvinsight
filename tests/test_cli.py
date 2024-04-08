@@ -29,15 +29,55 @@ def test_run_in_memory():
 
 
 def test_parse_dialect_delimiter():
-    opts = ('delimiter=\t', 'quotechar=\'', 'escapechar=\\', 'doublequote="',
+    opts = ('delimiter=\t', 'quotechar=\'', 'escapechar=\\', 'doublequote=False',
             'skipinitialspace=False', 'lineterminator=\n', 'quoting=QUOTE_ALL')
     dialect = csvinsight.cli._parse_dialect(opts)
     assert dialect.delimiter == '\t'
     assert dialect.quotechar == '\''
     assert dialect.escapechar == '\\'
-    assert dialect.doublequote == '"'
+    assert dialect.doublequote is False
     assert dialect.skipinitialspace is False
     assert dialect.quoting == csv.QUOTE_ALL
+
+
+def test_parse_dialect_edge_case():
+    opts = (
+        'delimiter=|',
+        'quotechar=',
+        'escapechar=',
+        'doublequote=true',
+        'skipinitialspace=False',
+        'lineterminator=\n',
+        'quoting=QUOTE_NONE',
+    )
+    dialect = csvinsight.cli._parse_dialect(opts)
+    assert dialect.delimiter == '|'
+    assert dialect.quotechar == None
+    assert dialect.escapechar == None
+    assert dialect.doublequote == True
+    assert dialect.skipinitialspace is False
+    assert dialect.quoting == csv.QUOTE_NONE
+
+
+def test_override_config():
+    buf = io.StringIO("""quotechar: null
+escapechar: null
+delimiter: '|'
+doublequote: true
+lineterminator: "\r\n"
+quoting: 3
+skipinitialspace: false
+""")
+    args = mock.Mock(dialect=[])
+    csvinsight.cli._override_config(buf, args)
+
+    dialect = csvinsight.cli._parse_dialect(args.dialect)
+    assert dialect.delimiter == '|'
+    assert dialect.quotechar == None
+    assert dialect.escapechar == None
+    assert dialect.doublequote == True
+    assert dialect.skipinitialspace is False
+    assert dialect.quoting == csv.QUOTE_NONE
 
 
 def test_print_column_summary():
