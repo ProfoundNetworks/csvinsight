@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 import csv
 import io
 import os.path as P
 
-import mock
+from unittest import mock
 
 import csvinsight.cli
 
