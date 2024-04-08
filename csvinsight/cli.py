@@ -203,7 +203,7 @@ CSV dialects are specified as space-separated key-value pairs, for example:
 
 For the list of available dialect parameters, see:
 
-    https://docs.python.org/2/library/csv.html#dialects-and-formatting-parameters
+    https://docs.python.org/3/library/csv.html#dialects-and-formatting-parameters
     """
     parser = argparse.ArgumentParser(
         description=description, formatter_class=argparse.RawDescriptionHelpFormatter,

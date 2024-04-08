@@ -1,0 +1,19 @@
+name: Test CSVInsight
+on: [push]
+jobs:
+  test:
+    timeout-minutes: 2
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: true
+      matrix:
+        py: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.py }}
+      - run: pip install flake8 plumbum pytest
+      - run: flake8 . --max-line-length 100
+      - run: pytest
