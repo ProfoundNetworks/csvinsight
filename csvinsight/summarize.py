@@ -1,5 +1,4 @@
 """Summarize a single column of values."""
-from __future__ import division
 import copy
 import distutils.spawn
 import heapq
@@ -8,12 +7,7 @@ import pipes
 import sys
 import tempfile
 
-import six
-
-if six.PY2:
-    NEWLINE = b'\n'
-else:
-    NEWLINE = u'\n'
+NEWLINE = '\n'
 
 MOST_COMMON = 20
 """The default number of most common items to show in the summary."""

@@ -4,10 +4,6 @@
 #
 
 """Console script for csvinsight."""
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-
 import argparse
 import csv
 import codecs
@@ -26,7 +22,6 @@ import tempfile
 import yaml
 
 import plumbum
-import six
 
 from . import split
 from . import summarize
@@ -51,7 +46,7 @@ def _print_header(histogram, fout):
     print('CSV Insight Report', file=fout)
     print('Total # Rows: %d' % sum(histogram.values()), file=fout)
     print('Column counts:', file=fout)
-    for num_col, freq in sorted(six.iteritems(histogram),
+    for num_col, freq in sorted(histogram.items(),
                                 key=lambda item: item[1], reverse=True):
         print('        %d  columns ->  %d rows' % (num_col, freq), file=fout)
     print("""
@@ -107,12 +102,12 @@ def _run_in_memory(reader, args):
 
 
 _CSV_DIALECT_PARAMS = {
-    'delimiter': b'|' if six.PY2 else '|',
-    'quotechar': b'\'' if six.PY2 else '\'',
-    'escapechar': b'\\' if six.PY2 else '\\',
-    'doublequote': b'"' if six.PY2 else '"',
+    'delimiter': '|',
+    'quotechar': '\'',
+    'escapechar': '\\',
+    'doublequote': True,
     'skipinitialspace': 'True',
-    'lineterminator': b'\n' if six.PY2 else '\n',
+    'lineterminator': '\n',
     'quoting': 'QUOTE_NONE'
 }
 
@@ -146,17 +141,36 @@ class Dialect(csv.Dialect):
 
 def _parse_dialect(pairs_as_strings):
     _LOGGER.debug('locals: %r', locals())
-    if six.PY2:
-        kwargs = dict(six.binary_type(pair).split(b'=', 1) for pair in pairs_as_strings)
-    else:
-        kwargs = dict(six.text_type(pair).split(u'=', 1) for pair in pairs_as_strings)
+    kwargs = dict(str(pair).split('=', 1) for pair in pairs_as_strings)
+
+    #
+    # From Py3.11 onwards, empty quotechar and escapechar are not allowed.
+    # None is still allowed, and achieves the desired behavior.
+    #
+    try:
+        if kwargs['quotechar'] == '':
+            kwargs['quotechar'] = None
+    except KeyError:
+        pass
+
+    try:
+        if kwargs['escapechar'] == '':
+            kwargs['escapechar'] = None
+    except KeyError:
+        pass
+
+    try:
+        kwargs['doublequote'] = kwargs['doublequote'].lower() in "true t yes y"
+    except KeyError:
+        pass
+
     dialect = Dialect(**kwargs)
     # dialect._validate()
     return dialect
 
 
 def _override_config(fin, args):
-    config = yaml.load(fin)
+    config = yaml.safe_load(fin)
     args.list_separator = config.get('list_separator', args.list_separator)
     args.list_fields = config.get('list_fields', args.list_fields)
 
@@ -314,23 +328,8 @@ For the list of available dialect parameters, see:
 
     if args.ipynb:
         _generate_ipython_report(args.ipynb, report_as_json)
-    #
-    # Reconcile differences between Py2 and Py3 here.
-    # _print_report expects strings and writes strings.
-    # Under Py2, everything until now outputs bytes, so we need to decode.
-    #
-    if six.PY2:
-        header = [h.decode('utf-8') for h in header]
-        for summary in results:
-            summary['most_common'] = [
-                (count, value.decode('utf-8'))
-                for (count, value) in summary['most_common']
-            ]
-        fout = codecs.getwriter('utf-8')(sys.stdout)
-    else:
-        fout = sys.stdout
 
-    _print_report(header, histogram, results, fout=fout)
+    _print_report(header, histogram, results, fout=sys.stdout)
 
 
 def _open_for_reading(path, encoding='utf-8'):
@@ -348,15 +347,13 @@ def _open_for_reading(path, encoding='utf-8'):
     """
     if _is_gzipped(path):
         fin = gzip.GzipFile(path, mode='rb')
-        if six.PY3:
-            #
-            # GzipFile docs state that it supports outputting text, but this
-            # doesn't seem so in practice, so we take care of it ourselves.
-            #
-            fin = codecs.getreader(encoding)(fin)
-        return fin
+        #
+        # GzipFile docs state that it supports outputting text, but this
+        # doesn't seem so in practice, so we take care of it ourselves.
+        #
+        return codecs.getreader(encoding)(fin)
     else:
-        return open(path, 'r' if six.PY3 else 'rb')
+        return open(path, 'r')
 
 
 def _is_tiny(path):

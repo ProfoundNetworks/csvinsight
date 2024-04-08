@@ -14,7 +14,6 @@ with open('HISTORY.rst') as history_file:
 requirements = [
     'plumbum',
     'pyyaml',
-    'six',
 ]
 
 setup_requirements = [
@@ -55,10 +54,10 @@ setup(
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Natural Language :: English',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
     ],
     test_suite='tests',
     tests_require=test_requirements,

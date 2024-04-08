@@ -1,15 +1,11 @@
 """Splits a CSV into multiple columns, one column per file."""
-from __future__ import unicode_literals
-
 import collections
 import gzip
 import logging
 import os
 import os.path as P
+import queue
 import threading
-
-import six
-import six.moves.queue as Queue
 
 MAX_QUEUE_SIZE = 10
 SENTINEL = None
@@ -29,7 +25,7 @@ class WriterThread(threading.Thread):
 
     :arg str subdir: The subdirectory where the output file should exist.
     :arg int column_id: The ordinal number of the column being written.
-    :arg Queue.Queue queue: The queue to read from
+    :arg queue.Queue queue: The queue to read from
     :arg open_temp: A callback for opening a temporary file.
     """
     def __init__(self, subdir, column_id, queue, open_temp=_open_temp):
@@ -38,35 +34,14 @@ class WriterThread(threading.Thread):
         self._queue = queue
         self._fout, self._path = open_temp(subdir, column_id)
 
-        #
-        # This works around a Py2 vs Py3 sticking point.
-        #
-        #   1. Py2 CSV readers output bytes.
-        #   2. Py3 CSV readers output strings.
-        #   3. We want bytes in our output to preserve the content of the
-        #      original file.
-        #
-        # A more elegant solution would be to use backports.csv for Py2, but
-        # that is quite slow when it comes to decoding Unicode.  Since we just
-        # want to split, and not necessarily decode Unicode, we use this ugly
-        # work-around instead.
-        #
-        self.write = self._write_py2 if six.PY2 else self._write_py3
-
     def run(self):
         lines = True
         while lines is not SENTINEL:
             lines = self._queue.get()
             if lines is not SENTINEL:
-                self.write(lines)
+                self._fout.write(('\n'.join(lines) + '\n').encode(TEXT_ENCODING))
             self._queue.task_done()
         self._fout.close()
-
-    def _write_py2(self, lines):
-        self._fout.write((b'\n'.join(lines) + b'\n'))
-
-    def _write_py3(self, lines):
-        self._fout.write(('\n'.join(lines) + '\n').encode(TEXT_ENCODING))
 
 
 def make_batches(iterable, batch_size=DEFAULT_BATCH_SIZE):
@@ -119,11 +94,12 @@ def _populate_queues(header, reader, queues, list_columns=[],
                 columns[col_num].extend(row[col_num].split(list_separator))
             for col_num in nonlist_column_numbers:
                 columns[col_num].append(row[col_num])
-        for queue, values in zip(queues, columns):
-            queue.put(values)
+        for q, values in zip(queues, columns):
+            q.put(values)
 
-    for queue in queues:
-        queue.put(SENTINEL)
+    for q in queues:
+        q.put(SENTINEL)
+
     return histogram
 
 
@@ -148,9 +124,6 @@ def split(header, reader, list_columns=[], list_separator=LIST_SEPARATOR, path=N
         raise ValueError('header may not be None')
     if path is None:
         raise ValueError('path may not be None')
-    if six.PY2:
-        list_columns = [six.binary_type(col) for col in list_columns]
-        list_separator = six.binary_type(list_separator)
 
     parts_dir, part_name = P.split(path)
     assert '/parts' in parts_dir, 'expected %r to contain "/parts"' % parts_dir
@@ -166,17 +139,17 @@ def split(header, reader, list_columns=[], list_separator=LIST_SEPARATOR, path=N
 
     os.mkdir(part_columns_dir)
 
-    queues = [Queue.Queue(MAX_QUEUE_SIZE) for _ in header]
-    threads = [WriterThread(part_columns_dir, i, queue)
-               for i, queue in enumerate(queues)]
+    queues = [queue.Queue(MAX_QUEUE_SIZE) for _ in header]
+    threads = [WriterThread(part_columns_dir, i, q)
+               for i, q in enumerate(queues)]
     for thread in threads:
         thread.start()
 
     histogram = _populate_queues(header, reader, queues,
                                  list_columns=list_columns, list_separator=list_separator)
 
-    for queue in queues:
-        queue.join()
+    for q in queues:
+        q.join()
 
     return histogram, [thread._path for thread in threads]
 
@@ -195,10 +168,6 @@ def split_in_memory(reader, list_columns=[], list_separator=LIST_SEPARATOR):
     :arg str list_separator: The separator to use when splitting columns.
     :returns: header, histogram, values for each columns
     :rtype: tuple of (list, collections.Counter, list of lists)"""
-    if six.PY2:
-        list_columns = [six.binary_type(col) for col in list_columns]
-        list_separator = six.binary_type(list_separator)
-
     try:
         header = next(reader)
     except StopIteration:

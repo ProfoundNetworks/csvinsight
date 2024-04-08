@@ -1,22 +1,15 @@
-from __future__ import unicode_literals
-
 import collections
 import io
+import queue
 
 import pytest
-import six
-import six.moves.queue as Queue
 
 import csvinsight.split
 
 
 def mock_batch():
-    if six.PY2:
-        yield [b'foo', b'bar']
-        yield [b'baz']
-    else:
-        yield ['foo', 'bar']
-        yield ['baz']
+    yield ['foo', 'bar']
+    yield ['baz']
     yield csvinsight.split.SENTINEL
 
 
@@ -27,12 +20,12 @@ def test_writer_thread():
     def open_temp_file(subdir, column_id):
         return buf, '/%s/%04d.gz' % (subdir, column_id)
 
-    queue = Queue.Queue()
+    q = queue.Queue()
     for batch in mock_batch():
-        queue.put(batch)
+        q.put(batch)
 
     thread = csvinsight.split.WriterThread(
-        '/tmp/subdir', 0, queue, open_temp=open_temp_file
+        '/tmp/subdir', 0, q, open_temp=open_temp_file
     )
     thread.start()
     thread.join()
@@ -70,7 +63,7 @@ def test_read_empty_file():
 def test_populate_queues():
     header = ('value', 'list')
     reader = [('123', 'a;b;c'), ('456', 'd;e;f'), ('789', 'g;h;i')]
-    queues = (Queue.Queue(), Queue.Queue())
+    queues = (queue.Queue(), queue.Queue())
     csvinsight.split._populate_queues(header, reader, queues,
                                       list_columns=['list'], batch_size=2)
 
@@ -84,9 +77,9 @@ def test_populate_queues():
     assert second == [['a', 'b', 'c', 'd', 'e', 'f'], ['g', 'h', 'i']]
 
 
-def read_queue(queue):
+def read_queue(q):
     while True:
-        item = queue.get()
+        item = q.get()
         if item == csvinsight.split.SENTINEL:
             break
         yield item

@@ -52,9 +52,9 @@ def test_parse_dialect_edge_case():
     )
     dialect = csvinsight.cli._parse_dialect(opts)
     assert dialect.delimiter == '|'
-    assert dialect.quotechar == None
-    assert dialect.escapechar == None
-    assert dialect.doublequote == True
+    assert dialect.quotechar is None
+    assert dialect.escapechar is None
+    assert dialect.doublequote is True
     assert dialect.skipinitialspace is False
     assert dialect.quoting == csv.QUOTE_NONE
 
@@ -73,9 +73,9 @@ skipinitialspace: false
 
     dialect = csvinsight.cli._parse_dialect(args.dialect)
     assert dialect.delimiter == '|'
-    assert dialect.quotechar == None
-    assert dialect.escapechar == None
-    assert dialect.doublequote == True
+    assert dialect.quotechar is None
+    assert dialect.escapechar is None
+    assert dialect.doublequote is True
     assert dialect.skipinitialspace is False
     assert dialect.quoting == csv.QUOTE_NONE
 
